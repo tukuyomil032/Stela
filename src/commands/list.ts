@@ -3,8 +3,15 @@ import { Presets, SingleBar } from 'cli-progress';
 import ora from 'ora';
 import { isCacheValid, loadCache, saveCache } from '../lib/cache.js';
 import { loadConfig } from '../lib/config.js';
-import { fetchAllStarred, unstarRepo } from '../lib/github.js';
-import { confirm, selectListAction, selectMultipleStarredRepos } from '../lib/interactive.js';
+import { fetchAllStarred, fetchLanguages, unstarRepo } from '../lib/github.js';
+import { createI18n } from '../lib/i18n.js';
+import {
+  confirm,
+  listWizard,
+  selectListAction,
+  selectMultipleStarredRepos,
+} from '../lib/interactive.js';
+import { bytesToBreakdown, formatLanguageBreakdown } from '../lib/languageColors.js';
 import { copyToClipboard, openInBrowser } from '../lib/system.js';
 import { printTable } from '../lib/table.js';
 import type { StarredRepo } from '../types/github.js';
@@ -18,6 +25,7 @@ interface ListOptions {
 
 export async function listCommand(options: ListOptions): Promise<void> {
   const config = loadConfig();
+  const t = createI18n(config.lang);
 
   let repos: StarredRepo[];
 
@@ -29,7 +37,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
     const token = getToken();
     const bar = new SingleBar(
       {
-        format: '取得中... {value} リポジトリ',
+        format: `${t.listFetching} {value}`,
         hideCursor: true,
       },
       Presets.shades_grey,
@@ -42,11 +50,21 @@ export async function listCommand(options: ListOptions): Promise<void> {
       });
       saveCache(repos);
       bar.stop();
-      console.log(chalk.green(`✓ Fetched ${repos.length} starred repositories`));
+      console.log(chalk.green(t.listFetched(repos.length)));
     } catch (e) {
       bar.stop();
       throw e;
     }
+  }
+
+  if (!options.lang && !options.sort && options.interactive) {
+    const wizardResult = await listWizard(t);
+    if (wizardResult === null) {
+      console.log(t.aborted);
+      return;
+    }
+    if (wizardResult.lang) options.lang = wizardResult.lang;
+    if (wizardResult.sort) options.sort = wizardResult.sort;
   }
 
   if (options.lang) {
@@ -63,24 +81,36 @@ export async function listCommand(options: ListOptions): Promise<void> {
   }
 
   if (repos.length === 0) {
-    console.log(chalk.yellow('No repositories found.'));
+    console.log(chalk.yellow(t.noReposFound));
     return;
   }
 
   if (!options.interactive) {
-    printTable(repos);
+    printTable(repos, t);
     return;
   }
 
   const selected = await selectMultipleStarredRepos(repos);
   if (selected.length === 0) {
-    console.log(chalk.yellow('No repositories selected.'));
+    console.log(chalk.yellow(t.noReposSelected));
     return;
+  }
+
+  // Show language breakdown for selected repos
+  const { getToken: getTokenForLang } = await import('../lib/auth.js');
+  const tokenForLang = getTokenForLang();
+  for (const repo of selected) {
+    const [owner, repoName] = repo.full_name.split('/');
+    const bytes = await fetchLanguages(tokenForLang, owner, repoName);
+    const breakdown = formatLanguageBreakdown(bytesToBreakdown(bytes));
+    if (breakdown) {
+      console.log(`  ${chalk.cyan(repo.full_name)} └─ ${breakdown}`);
+    }
   }
 
   const action = await selectListAction();
   if (action === null) {
-    console.log('Aborted.');
+    console.log(t.aborted);
     return;
   }
 
@@ -91,11 +121,11 @@ export async function listCommand(options: ListOptions): Promise<void> {
   } else if (action === 'clipboard') {
     const urls = selected.map((r) => r.html_url).join('\n');
     copyToClipboard(urls);
-    console.log(chalk.green(`✓ Copied ${selected.length} URL(s) to clipboard`));
+    console.log(chalk.green(t.listCopied(selected.length)));
   } else if (action === 'unstar') {
-    const ok = await confirm(`Unstar ${selected.length} repositories?`);
+    const ok = await confirm(t.listUnstarConfirm(selected.length));
     if (!ok) {
-      console.log('Aborted.');
+      console.log(t.aborted);
       return;
     }
     const { getToken } = await import('../lib/auth.js');
@@ -103,7 +133,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
     const succeeded: StarredRepo[] = [];
     for (const repo of selected) {
       const [owner, repoName] = repo.full_name.split('/');
-      const spinner = ora(`Unstarring ${repo.full_name}...`).start();
+      const spinner = ora(t.listUnstarring(repo.full_name)).start();
       try {
         await unstarRepo(token, owner, repoName);
         spinner.succeed(`Unstarred ${repo.full_name}`);
@@ -117,6 +147,6 @@ export async function listCommand(options: ListOptions): Promise<void> {
     if (cache) {
       saveCache(cache.repos.filter((r) => !removedSet.has(r.full_name)));
     }
-    console.log(chalk.green(`✓ Unstarred ${succeeded.length} repositories`));
+    console.log(chalk.green(t.listUnstarred(succeeded.length)));
   }
 }

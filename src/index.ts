@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { cacheClearCommand, cacheStatusCommand } from './commands/cache.js';
-import { configSetCommand, configShowCommand } from './commands/config.js';
+import { cacheClearCommand, cacheStatusCommand, cacheWizardCommand } from './commands/cache.js';
+import { configSetCommand, configShowCommand, configWizardCommand } from './commands/config.js';
 import { listCommand } from './commands/list.js';
 import { searchCommand } from './commands/search.js';
 import { starCommand } from './commands/star.js';
@@ -45,7 +45,7 @@ program
   });
 
 program
-  .command('search <query>')
+  .command('search [query]')
   .description('Search GitHub repositories and star them')
   .option('--no-interactive', 'Output as table only (non-interactive, no starring)')
   .option('--lang <lang>', 'Filter by programming language')
@@ -57,6 +57,10 @@ program
   });
 
 const cacheCommand = new Command('cache').description('Manage cache');
+
+cacheCommand.action(async () => {
+  await cacheWizardCommand();
+});
 
 cacheCommand
   .command('clear')
@@ -75,6 +79,10 @@ cacheCommand
 program.addCommand(cacheCommand);
 
 const configCommand = new Command('config').description('Manage configuration');
+
+configCommand.action(async () => {
+  await configWizardCommand();
+});
 
 configCommand
   .command('show')
