@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { cacheClearCommand, cacheStatusCommand } from './commands/cache.js';
 import { listCommand } from './commands/list.js';
 import { starCommand } from './commands/star.js';
 import { unstarCommand } from './commands/unstar.js';
@@ -40,5 +41,23 @@ program
   .action(async (target, options) => {
     await unstarCommand(target, options);
   });
+
+const cacheCommand = new Command('cache').description('Manage cache');
+
+cacheCommand
+  .command('clear')
+  .description('Clear the cache')
+  .action(() => {
+    cacheClearCommand();
+  });
+
+cacheCommand
+  .command('status')
+  .description('Show cache status')
+  .action(() => {
+    cacheStatusCommand();
+  });
+
+program.addCommand(cacheCommand);
 
 program.parse(process.argv);
