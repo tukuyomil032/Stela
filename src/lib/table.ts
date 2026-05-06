@@ -1,5 +1,7 @@
 import chalk from 'chalk';
 import type { SearchRepo, StarredRepo } from '../types/github.js';
+import type { Messages } from './i18n.js';
+import { colorizeLanguage } from './languageColors.js';
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -9,138 +11,192 @@ function formatDate(dateString: string): string {
   return `${year}-${month}-${day}`;
 }
 
-function getColumnWidths(repos: StarredRepo[]): {
-  name: number;
-  language: number;
-  stars: number;
-  date: number;
-} {
-  let nameWidth = 'Repository'.length;
-  let languageWidth = 'Language'.length;
-  let starsWidth = 'Stars'.length;
-  let dateWidth = 'Updated'.length;
-
-  repos.forEach((repo) => {
-    nameWidth = Math.max(nameWidth, repo.full_name.length);
-    languageWidth = Math.max(languageWidth, repo.language ? repo.language.length : 1);
-    starsWidth = Math.max(starsWidth, String(repo.stargazers_count).length + 2);
-    dateWidth = Math.max(dateWidth, formatDate(repo.updated_at).length);
-  });
-
-  return { name: nameWidth, language: languageWidth, stars: starsWidth, date: dateWidth };
+function padRaw(rawStr: string, coloredStr: string, width: number): string {
+  const padding = Math.max(0, width - rawStr.length);
+  return coloredStr + ' '.repeat(padding);
 }
 
-function padRight(str: string, width: number): string {
-  return str + ' '.repeat(Math.max(0, width - str.length));
+function printBox(title: string): void {
+  const inner = `  ${title}  `;
+  const line = '═'.repeat(inner.length);
+  console.log(chalk.bold.cyan(`╔${line}╗`));
+  console.log(chalk.bold.cyan(`║${inner}║`));
+  console.log(chalk.bold.cyan(`╚${line}╝`));
 }
 
-export function printTable(repos: StarredRepo[]): void {
+export function printTable(repos: StarredRepo[], t: Messages): void {
   if (repos.length === 0) {
-    console.log('No repositories found.');
+    console.log(t.noReposFound);
     return;
   }
 
-  const widths = getColumnWidths(repos);
+  console.log('');
+  printBox(`★ ${t.tableHeader(repos.length)}`);
+  console.log('');
 
-  const headerLine =
-    padRight('Repository', widths.name) +
-    '  ' +
-    padRight('Language', widths.language) +
-    '  ' +
-    padRight('Stars', widths.stars) +
-    '  ' +
-    padRight('Updated', widths.date);
-  console.log(chalk.bold(headerLine));
+  let nameWidth = t.tableRepo.length;
+  let langWidth = t.tableLang.length;
+  let starsWidth = t.tableStars.length;
+  let dateWidth = t.tableUpdated.length;
 
-  const separatorLine =
-    padRight('-'.repeat(widths.name), widths.name) +
-    '  ' +
-    padRight('-'.repeat(widths.language), widths.language) +
-    '  ' +
-    padRight('-'.repeat(widths.stars), widths.stars) +
-    '  ' +
-    padRight('-'.repeat(widths.date), widths.date);
-  console.log(separatorLine);
-
-  repos.forEach((repo) => {
-    const name = chalk.cyan(padRight(repo.full_name, widths.name));
-    const language = chalk.yellow(padRight(repo.language ? repo.language : '-', widths.language));
-    const stars = chalk.green(padRight(`★ ${repo.stargazers_count}`, widths.stars));
-    const date = padRight(formatDate(repo.updated_at), widths.date);
-
-    console.log(`${name}  ${language}  ${stars}  ${date}`);
-  });
-}
-
-function getSearchColumnWidths(repos: SearchRepo[]): {
-  name: number;
-  language: number;
-  stars: number;
-  forks: number;
-  date: number;
-} {
-  let nameWidth = 'Repository'.length;
-  let languageWidth = 'Language'.length;
-  let starsWidth = 'Stars'.length;
-  let forksWidth = 'Forks'.length;
-  let dateWidth = 'Updated'.length;
-
-  repos.forEach((repo) => {
+  for (const repo of repos) {
     nameWidth = Math.max(nameWidth, repo.full_name.length);
-    languageWidth = Math.max(languageWidth, repo.language ? repo.language.length : 1);
-    starsWidth = Math.max(starsWidth, String(repo.stargazers_count).length + 2);
-    forksWidth = Math.max(forksWidth, String(repo.forks_count).length + 2);
+    langWidth = Math.max(langWidth, repo.language ? repo.language.length : 'unknown'.length);
+    const starsRaw = repo.stargazers_count.toLocaleString();
+    starsWidth = Math.max(starsWidth, starsRaw.length + 2);
     dateWidth = Math.max(dateWidth, formatDate(repo.updated_at).length);
+  }
+
+  const numWidth = 4;
+  const gap = '   ';
+
+  const headerNum = ' '.repeat(numWidth);
+  const headerName = padRaw(t.tableRepo, chalk.bold(t.tableRepo), nameWidth);
+  const headerLang = padRaw(t.tableLang, chalk.bold(t.tableLang), langWidth);
+  const headerStars = padRaw(t.tableStars, chalk.bold(t.tableStars), starsWidth);
+  const headerDate = chalk.bold(t.tableUpdated);
+  console.log(
+    `  ${headerNum}${gap}${headerName}${gap}${headerLang}${gap}${headerStars}${gap}${headerDate}`,
+  );
+
+  const sepWidth =
+    numWidth +
+    gap.length +
+    nameWidth +
+    gap.length +
+    langWidth +
+    gap.length +
+    starsWidth +
+    gap.length +
+    dateWidth;
+  console.log(`  ${chalk.dim('─'.repeat(sepWidth))}`);
+
+  repos.forEach((repo, idx) => {
+    const numRaw = String(idx + 1);
+    const numPadded = numRaw.padStart(numWidth);
+    const numColored = chalk.dim(numPadded);
+
+    const nameRaw = repo.full_name;
+    const nameColored = padRaw(nameRaw, chalk.cyan(nameRaw), nameWidth);
+
+    const langRaw = repo.language || 'unknown';
+    const langColored = padRaw(langRaw, colorizeLanguage(repo.language), langWidth);
+
+    const starsCount = repo.stargazers_count.toLocaleString();
+    const starsRaw = `★ ${starsCount}`;
+    const starsColored = padRaw(
+      starsRaw,
+      `${chalk.yellow('★')} ${chalk.green(starsCount)}`,
+      starsWidth,
+    );
+
+    const dateRaw = formatDate(repo.updated_at);
+    const dateColored = chalk.dim(dateRaw);
+
+    console.log(
+      `  ${numColored}${gap}${nameColored}${gap}${langColored}${gap}${starsColored}${gap}${dateColored}`,
+    );
   });
 
-  return {
-    name: nameWidth,
-    language: languageWidth,
-    stars: starsWidth,
-    forks: forksWidth,
-    date: dateWidth,
-  };
+  console.log(`  ${chalk.dim('─'.repeat(sepWidth))}`);
+  console.log(`  Total: ${repos.length} repositories`);
 }
 
-export function printSearchTable(repos: SearchRepo[]): void {
+export function printSearchTable(repos: SearchRepo[], t: Messages, highlightTop?: number): void {
   if (repos.length === 0) {
-    console.log('No repositories found.');
+    console.log(t.noReposFound);
     return;
   }
 
-  const widths = getSearchColumnWidths(repos);
+  console.log('');
+  printBox(`🔍 ${t.tableSearchHeader(repos.length)}`);
+  console.log('');
 
-  const headerLine =
-    padRight('Repository', widths.name) +
-    '  ' +
-    padRight('Language', widths.language) +
-    '  ' +
-    padRight('Stars', widths.stars) +
-    '  ' +
-    padRight('Forks', widths.forks) +
-    '  ' +
-    padRight('Updated', widths.date);
-  console.log(chalk.bold(headerLine));
+  let nameWidth = t.tableRepo.length;
+  let langWidth = t.tableLang.length;
+  let starsWidth = t.tableStars.length;
+  let forksWidth = t.tableForks.length;
+  let dateWidth = t.tableUpdated.length;
 
-  const separatorLine =
-    padRight('-'.repeat(widths.name), widths.name) +
-    '  ' +
-    padRight('-'.repeat(widths.language), widths.language) +
-    '  ' +
-    padRight('-'.repeat(widths.stars), widths.stars) +
-    '  ' +
-    padRight('-'.repeat(widths.forks), widths.forks) +
-    '  ' +
-    padRight('-'.repeat(widths.date), widths.date);
-  console.log(separatorLine);
+  for (const repo of repos) {
+    nameWidth = Math.max(nameWidth, repo.full_name.length);
+    langWidth = Math.max(langWidth, repo.language ? repo.language.length : 'unknown'.length);
+    const starsRaw = repo.stargazers_count.toLocaleString();
+    starsWidth = Math.max(starsWidth, starsRaw.length + 2);
+    const forksRaw = repo.forks_count.toLocaleString();
+    forksWidth = Math.max(forksWidth, forksRaw.length + 2);
+    dateWidth = Math.max(dateWidth, formatDate(repo.updated_at).length);
+  }
 
-  repos.forEach((repo) => {
-    const name = chalk.cyan(padRight(repo.full_name, widths.name));
-    const language = chalk.yellow(padRight(repo.language ? repo.language : '-', widths.language));
-    const stars = chalk.green(padRight(`★ ${repo.stargazers_count}`, widths.stars));
-    const forks = chalk.magenta(padRight(`⎇ ${repo.forks_count}`, widths.forks));
-    const date = padRight(formatDate(repo.updated_at), widths.date);
+  const numWidth = 4;
+  const gap = '   ';
 
-    console.log(`${name}  ${language}  ${stars}  ${forks}  ${date}`);
+  const headerNum = ' '.repeat(numWidth);
+  const headerName = padRaw(t.tableRepo, chalk.bold(t.tableRepo), nameWidth);
+  const headerLang = padRaw(t.tableLang, chalk.bold(t.tableLang), langWidth);
+  const headerStars = padRaw(t.tableStars, chalk.bold(t.tableStars), starsWidth);
+  const headerForks = padRaw(t.tableForks, chalk.bold(t.tableForks), forksWidth);
+  const headerDate = chalk.bold(t.tableUpdated);
+  console.log(
+    `  ${headerNum}${gap}${headerName}${gap}${headerLang}${gap}${headerStars}${gap}${headerForks}${gap}${headerDate}`,
+  );
+
+  const sepWidth =
+    numWidth +
+    gap.length +
+    nameWidth +
+    gap.length +
+    langWidth +
+    gap.length +
+    starsWidth +
+    gap.length +
+    forksWidth +
+    gap.length +
+    dateWidth;
+  console.log(`  ${chalk.dim('─'.repeat(sepWidth))}`);
+
+  const top = highlightTop ?? repos.length;
+
+  repos.forEach((repo, idx) => {
+    const rank = idx + 1;
+    const numRaw = String(rank);
+    const numPadded = numRaw.padStart(numWidth);
+    const numColored = chalk.dim(numPadded);
+
+    const nameRaw = repo.full_name;
+    const langRaw = repo.language || 'unknown';
+    const starsCount = repo.stargazers_count.toLocaleString();
+    const starsRaw = `★ ${starsCount}`;
+    const forksCount = repo.forks_count.toLocaleString();
+    const forksRaw = `⎇ ${forksCount}`;
+    const dateRaw = formatDate(repo.updated_at);
+
+    const nameColored = padRaw(nameRaw, chalk.cyan(nameRaw), nameWidth);
+    const langColored = padRaw(langRaw, colorizeLanguage(repo.language), langWidth);
+    const starsColored = padRaw(
+      starsRaw,
+      `${chalk.yellow('★')} ${chalk.green(starsCount)}`,
+      starsWidth,
+    );
+    const forksColored = padRaw(
+      forksRaw,
+      `${chalk.magenta('⎇')} ${chalk.magenta(forksCount)}`,
+      forksWidth,
+    );
+    const dateColored = chalk.dim(dateRaw);
+
+    const line = `  ${numColored}${gap}${nameColored}${gap}${langColored}${gap}${starsColored}${gap}${forksColored}${gap}${dateColored}`;
+
+    if (rank <= 3 && rank <= top) {
+      console.log(`${chalk.bold.yellow(line)} ◆`);
+    } else if (rank <= 6 && rank <= top) {
+      console.log(chalk.bold(line));
+    } else if (rank <= 10 && rank <= top) {
+      console.log(chalk.white(line));
+    } else {
+      console.log(line);
+    }
   });
+
+  console.log(`  ${chalk.dim('─'.repeat(sepWidth))}`);
 }
