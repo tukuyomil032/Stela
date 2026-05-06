@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { cacheClearCommand, cacheStatusCommand } from './commands/cache.js';
+import { configSetCommand, configShowCommand } from './commands/config.js';
 import { listCommand } from './commands/list.js';
 import { starCommand } from './commands/star.js';
 import { unstarCommand } from './commands/unstar.js';
@@ -59,5 +60,23 @@ cacheCommand
   });
 
 program.addCommand(cacheCommand);
+
+const configCommand = new Command('config').description('Manage configuration');
+
+configCommand
+  .command('show')
+  .description('Show current configuration')
+  .action(() => {
+    configShowCommand();
+  });
+
+configCommand
+  .command('set <key> <value>')
+  .description('Set a configuration value (keys: cacheTTL, defaultLanguageFilter, pageSize)')
+  .action((key, value) => {
+    configSetCommand(key, value);
+  });
+
+program.addCommand(configCommand);
 
 program.parse(process.argv);
