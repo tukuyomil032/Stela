@@ -76,3 +76,54 @@ export async function selectMultipleRepos(repos: SearchRepo[]): Promise<SearchRe
     throw error;
   }
 }
+
+export type ListAction = 'browser' | 'clipboard' | 'unstar';
+
+export async function selectMultipleStarredRepos(repos: StarredRepo[]): Promise<StarredRepo[]> {
+  try {
+    const choices = repos.map((repo) => ({
+      name: `${repo.full_name} (${repo.language || 'Unknown'}) ★${repo.stargazers_count}`,
+      value: repo.full_name,
+    }));
+
+    const answers = await inquirer.prompt([
+      {
+        type: 'checkbox',
+        name: 'selected',
+        message: 'Select repositories (space to toggle, enter to confirm):',
+        choices,
+      },
+    ]);
+
+    const selectedFullNames = answers.selected as string[];
+    return repos.filter((repo) => selectedFullNames.includes(repo.full_name));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('User force closed')) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+export async function selectListAction(): Promise<ListAction | null> {
+  try {
+    const answers = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: 'Choose an action:',
+        choices: [
+          { name: 'Open in browser', value: 'browser' },
+          { name: 'Copy URL to clipboard', value: 'clipboard' },
+          { name: 'Unstar selected', value: 'unstar' },
+        ],
+      },
+    ]);
+    return answers.action as ListAction;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('User force closed')) {
+      return null;
+    }
+    throw error;
+  }
+}
