@@ -1,0 +1,68 @@
+{
+  "name": "@tukuyomil032/stela",
+  "private": false,
+  "version": "0.0.0",
+  "description": "A TypeScript-based CLI that lets you view a list of repositories you've starred, unstar them, and search for repositories using a wide range of criteria—such as language, genre, and keyword matches—to find new ones to star.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "bin": {
+    "stela": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "husky",
+    "prepublishOnly": "bun run build",
+    "dev": "ts-node --esm src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint-staged": "lint-staged",
+    "format": "biome format --write .",
+    "lint": "biome lint --write .",
+    "biome:check": "biome check .",
+    "biome:fix": "biome check . --write",
+    "postbuild": "node -e \"require('fs').chmodSync('dist/index.js', 0o755)\""
+  },
+  "keywords": [
+    "cli",
+    "scaffold",
+    "typescript",
+    "generator"
+  ],
+  "author": "tukuyomil032",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tukuyomil032/stela.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tukuyomil032/stela/issues"
+  },
+  "homepage": "https://github.com/tukuyomil032/stela#readme",
+  "dependencies": {
+    "commander": "^14.0.3",
+    "inquirer": "^13.4.2",
+    "chalk": "^5.6.2",
+    "cli-progress": "^3.12.0",
+    "ora": "^9.4.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
+    "@types/cli-progress": "^3.11.6",
+    "@types/node": "^25.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,jsonc,md}": [
+      "biome check --write"
+    ]
+  },
+  "packageManager": "bun@1.3.13"
+}
