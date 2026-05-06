@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { listCommand } from './commands/list.js';
+import { starCommand } from './commands/star.js';
 import { unstarCommand } from './commands/unstar.js';
 
 const program = new Command();
@@ -21,6 +22,14 @@ program
   .option('--refresh', 'Force refresh cache', false)
   .action(async (options) => {
     await listCommand(options);
+  });
+
+program
+  .command('star <target>')
+  .description('Star a repository (format: owner/repo or GitHub URL)')
+  .option('--no-interactive', 'Disable interactive mode')
+  .action(async (target, options) => {
+    await starCommand(target, options);
   });
 
 program
