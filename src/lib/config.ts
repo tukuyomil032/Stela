@@ -10,6 +10,7 @@ const DEFAULT_CONFIG: StelaConfig = {
   cacheTTL: 30,
   defaultLanguageFilter: [],
   pageSize: 30,
+  lang: 'en',
 };
 
 export function loadConfig(): StelaConfig {

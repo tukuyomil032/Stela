@@ -11,6 +11,9 @@ function headers(token: string): Record<string, string> {
   };
 }
 
+// Session-level in-memory cache for language data
+const languageCache = new Map<string, Record<string, number>>();
+
 export async function fetchAllStarred(
   token: string,
   onPage?: (fetched: number, page: number) => void,
@@ -91,4 +94,31 @@ export async function searchRepos(
 
   const data = (await res.json()) as SearchResult;
   return data.items.slice(0, options.limit ?? 30);
+}
+
+export async function fetchLanguages(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<Record<string, number>> {
+  const key = `${owner}/${repo}`;
+  const cached = languageCache.get(key);
+  if (cached) return cached;
+
+  const res = await fetch(`${BASE_URL}/repos/${owner}/${repo}/languages`, {
+    headers: headers(token),
+  });
+
+  if (res.status === 404) {
+    languageCache.set(key, {});
+    return {};
+  }
+
+  if (!res.ok) {
+    exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
+  }
+
+  const data = (await res.json()) as Record<string, number>;
+  languageCache.set(key, data);
+  return data;
 }
