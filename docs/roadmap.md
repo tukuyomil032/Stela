@@ -2,25 +2,38 @@
 
 ## Phase1 — MVP
 
-- [ ] gh auth token 経由の認証
-- [ ] `list` コマンド（インタラクティブ + `--no-interactive`）
-- [ ] `unstar` コマンド
-- [ ] `star` コマンド
-- [ ] JSON キャッシュ（TTL 付き）
-- [ ] `cache` サブコマンド（`clear` / `status`）
-- [ ] `config` サブコマンド（`show` / `set`）
+- [x] gh auth token 経由の認証
+- [x] `list` コマンド（インタラクティブ + `--no-interactive`）
+- [x] `unstar` コマンド
+- [x] `star` コマンド
+- [x] JSON キャッシュ（TTL 付き）
+- [x] `cache` サブコマンド（`clear` / `status`）
+- [x] `config` サブコマンド（`show` / `set`）
 
 ## Phase2 — 検索強化
 
-- [ ] `search` コマンド
-- [ ] `--lang`, `--sort` フィルタ
-- [ ] ページネーション完全対応（全件取得 + cli-progress プログレスバー）
+- [x] `search` コマンド
+- [x] `--lang`, `--sort` フィルタ
+- [x] ページネーション完全対応（全件取得 + cli-progress プログレスバー）
 
 ## Phase3 — UX 改善
 
-- [ ] `list` で複数選択 → 一括 `unstar`
-- [ ] `open in browser` アクション（list インタラクティブ時）
-- [ ] `copy URL to clipboard` アクション
+- [x] `list` で複数選択 → 一括 `unstar`
+- [x] `open in browser` アクション（list インタラクティブ時）
+- [x] `copy URL to clipboard` アクション
+
+## Phase4 — 表示UX・多言語・検索強化
+
+- [x] 出力テキスト全体の英語統一 + `config set lang ja` で日本語切り替え（i18n）
+- [x] GitHub linguist カラーマップによる言語名の色付け
+- [x] 表示フォーマット変更: `#N/★X - owner/repo (Lang1/XX% Lang2/XX%)`
+- [x] ASCII装飾（`╔══╗`, `──`）によるセクション区切り
+- [x] インタラクティブリストへの番号付け
+- [x] search 結果 Star 上位3件の強調表示（◆マーク）
+- [x] 言語使用率のオンデマンド取得（選択後に `/repos/{owner}/{repo}/languages`）
+- [x] search: 複数条件ソート（Stars×重み + 更新日×重みなどの複合スコア）
+- [x] search: ウィザードモード（プリセット4種 / カスタム条件）
+- [x] list/cache/config: オプションなし実行でウィザードモード起動
 
 ## 将来検討（バージョン未定）
 
