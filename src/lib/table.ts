@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import type { StarredRepo } from '../types/github.js';
+import type { SearchRepo, StarredRepo } from '../types/github.js';
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -69,5 +69,78 @@ export function printTable(repos: StarredRepo[]): void {
     const date = padRight(formatDate(repo.updated_at), widths.date);
 
     console.log(`${name}  ${language}  ${stars}  ${date}`);
+  });
+}
+
+function getSearchColumnWidths(repos: SearchRepo[]): {
+  name: number;
+  language: number;
+  stars: number;
+  forks: number;
+  date: number;
+} {
+  let nameWidth = 'Repository'.length;
+  let languageWidth = 'Language'.length;
+  let starsWidth = 'Stars'.length;
+  let forksWidth = 'Forks'.length;
+  let dateWidth = 'Updated'.length;
+
+  repos.forEach((repo) => {
+    nameWidth = Math.max(nameWidth, repo.full_name.length);
+    languageWidth = Math.max(languageWidth, repo.language ? repo.language.length : 1);
+    starsWidth = Math.max(starsWidth, String(repo.stargazers_count).length + 2);
+    forksWidth = Math.max(forksWidth, String(repo.forks_count).length + 2);
+    dateWidth = Math.max(dateWidth, formatDate(repo.updated_at).length);
+  });
+
+  return {
+    name: nameWidth,
+    language: languageWidth,
+    stars: starsWidth,
+    forks: forksWidth,
+    date: dateWidth,
+  };
+}
+
+export function printSearchTable(repos: SearchRepo[]): void {
+  if (repos.length === 0) {
+    console.log('No repositories found.');
+    return;
+  }
+
+  const widths = getSearchColumnWidths(repos);
+
+  const headerLine =
+    padRight('Repository', widths.name) +
+    '  ' +
+    padRight('Language', widths.language) +
+    '  ' +
+    padRight('Stars', widths.stars) +
+    '  ' +
+    padRight('Forks', widths.forks) +
+    '  ' +
+    padRight('Updated', widths.date);
+  console.log(chalk.bold(headerLine));
+
+  const separatorLine =
+    padRight('-'.repeat(widths.name), widths.name) +
+    '  ' +
+    padRight('-'.repeat(widths.language), widths.language) +
+    '  ' +
+    padRight('-'.repeat(widths.stars), widths.stars) +
+    '  ' +
+    padRight('-'.repeat(widths.forks), widths.forks) +
+    '  ' +
+    padRight('-'.repeat(widths.date), widths.date);
+  console.log(separatorLine);
+
+  repos.forEach((repo) => {
+    const name = chalk.cyan(padRight(repo.full_name, widths.name));
+    const language = chalk.yellow(padRight(repo.language ? repo.language : '-', widths.language));
+    const stars = chalk.green(padRight(`★ ${repo.stargazers_count}`, widths.stars));
+    const forks = chalk.magenta(padRight(`⎇ ${repo.forks_count}`, widths.forks));
+    const date = padRight(formatDate(repo.updated_at), widths.date);
+
+    console.log(`${name}  ${language}  ${stars}  ${forks}  ${date}`);
   });
 }

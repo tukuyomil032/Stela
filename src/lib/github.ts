@@ -1,4 +1,4 @@
-import type { StarredRepo } from '../types/github.js';
+import type { SearchRepo, SearchResult, StarredRepo } from '../types/github.js';
 import { exitWithError } from './error.js';
 
 const BASE_URL = 'https://api.github.com';
@@ -11,7 +11,10 @@ function headers(token: string): Record<string, string> {
   };
 }
 
-export async function fetchAllStarred(token: string): Promise<StarredRepo[]> {
+export async function fetchAllStarred(
+  token: string,
+  onPage?: (fetched: number, page: number) => void,
+): Promise<StarredRepo[]> {
   const repos: StarredRepo[] = [];
   let page = 1;
 
@@ -28,6 +31,7 @@ export async function fetchAllStarred(token: string): Promise<StarredRepo[]> {
     if (data.length === 0) break;
 
     repos.push(...data);
+    onPage?.(repos.length, page);
     if (data.length < 100) break;
     page++;
   }
@@ -55,4 +59,36 @@ export async function starRepo(token: string, owner: string, repo: string): Prom
   if (res.status !== 204) {
     exitWithError(`Failed to star ${owner}/${repo}: ${res.status} ${res.statusText}`);
   }
+}
+
+export async function searchRepos(
+  token: string,
+  query: string,
+  options: { lang?: string; sort?: string; limit?: number },
+): Promise<SearchRepo[]> {
+  let searchQuery = query;
+  if (options.lang) {
+    searchQuery += ` language:${options.lang}`;
+  }
+
+  const perPage = Math.min(options.limit ?? 30, 100);
+  const sort = options.sort ?? 'stars';
+
+  const params = new URLSearchParams({
+    q: searchQuery,
+    sort,
+    order: 'desc',
+    per_page: String(perPage),
+  });
+
+  const res = await fetch(`${BASE_URL}/search/repositories?${params}`, {
+    headers: headers(token),
+  });
+
+  if (!res.ok) {
+    exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
+  }
+
+  const data = (await res.json()) as SearchResult;
+  return data.items.slice(0, options.limit ?? 30);
 }

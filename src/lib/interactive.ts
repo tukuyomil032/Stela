@@ -1,5 +1,5 @@
 import inquirer from 'inquirer';
-import type { StarredRepo } from '../types/github.js';
+import type { SearchRepo, StarredRepo } from '../types/github.js';
 
 export async function selectRepo(repos: StarredRepo[]): Promise<StarredRepo | null> {
   try {
@@ -44,6 +44,34 @@ export async function confirm(message: string): Promise<boolean> {
   } catch (error) {
     if (error instanceof Error && error.message.includes('User force closed')) {
       return false;
+    }
+    throw error;
+  }
+}
+
+export async function selectMultipleRepos(repos: SearchRepo[]): Promise<SearchRepo[]> {
+  try {
+    const choices = repos.map((repo) => ({
+      name: `${repo.full_name} (${repo.language || 'Unknown'}) ★${repo.stargazers_count}`,
+      value: repo.full_name,
+    }));
+
+    const answers = await inquirer.prompt([
+      {
+        type: 'checkbox',
+        name: 'selected',
+        message: 'Select repositories to star (space to toggle, enter to confirm):',
+        choices,
+      },
+    ]);
+
+    const selectedFullNames = answers.selected as string[];
+    const selectedRepos = repos.filter((repo) => selectedFullNames.includes(repo.full_name));
+
+    return selectedRepos;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('User force closed')) {
+      return [];
     }
     throw error;
   }

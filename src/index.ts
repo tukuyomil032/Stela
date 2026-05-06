@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { cacheClearCommand, cacheStatusCommand } from './commands/cache.js';
 import { configSetCommand, configShowCommand } from './commands/config.js';
 import { listCommand } from './commands/list.js';
+import { searchCommand } from './commands/search.js';
 import { starCommand } from './commands/star.js';
 import { unstarCommand } from './commands/unstar.js';
 
@@ -41,6 +42,18 @@ program
   .option('-y, --yes', 'Skip confirmation prompt', false)
   .action(async (target, options) => {
     await unstarCommand(target, options);
+  });
+
+program
+  .command('search <query>')
+  .description('Search GitHub repositories and star them')
+  .option('--no-interactive', 'Output as table only (non-interactive, no starring)')
+  .option('--lang <lang>', 'Filter by programming language')
+  .option('--sort <sort>', 'Sort by: stars | forks | updated', 'stars')
+  .option('--limit <n>', 'Number of results (max 100)', '30')
+  .action(async (query, options) => {
+    options.limit = parseInt(options.limit, 10);
+    await searchCommand(query, options);
   });
 
 const cacheCommand = new Command('cache').description('Manage cache');

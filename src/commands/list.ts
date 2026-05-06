@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import ora from 'ora';
+import { Presets, SingleBar } from 'cli-progress';
 import { isCacheValid, loadCache, saveCache } from '../lib/cache.js';
 import { loadConfig } from '../lib/config.js';
 import { fetchAllStarred } from '../lib/github.js';
@@ -25,13 +25,24 @@ export async function listCommand(options: ListOptions): Promise<void> {
   } else {
     const { getToken } = await import('../lib/auth.js');
     const token = getToken();
-    const spinner = ora('Fetching starred repositories...').start();
+    const bar = new SingleBar(
+      {
+        format: '取得中... {value} リポジトリ',
+        hideCursor: true,
+      },
+      Presets.shades_grey,
+    );
+
+    bar.start(Number.MAX_SAFE_INTEGER, 0);
     try {
-      repos = await fetchAllStarred(token);
+      repos = await fetchAllStarred(token, (fetched) => {
+        bar.update(fetched);
+      });
       saveCache(repos);
-      spinner.succeed(`Fetched ${repos.length} starred repositories`);
+      bar.stop();
+      console.log(chalk.green(`✓ Fetched ${repos.length} starred repositories`));
     } catch (e) {
-      spinner.fail('Failed to fetch repositories');
+      bar.stop();
       throw e;
     }
   }
