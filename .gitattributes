@@ -1,0 +1,8 @@
+node_modules/** linguist-vendored=true
+dist/** linguist-vendored=true
+build/** linguist-vendored=true
+pnpm-lock.yaml linguist-generated=true
+
+skills-lock.json linguist-generated=true
+.agents/** linguist-vendored=true
+.claude/** linguist-vendored=true

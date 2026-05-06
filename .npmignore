@@ -1,0 +1,79 @@
+# Source files
+src/
+tsconfig.json
+eslint.config.js
+.prettierrc
+.prettierignore
+.editorconfig
+biome.json
+biome.jsonc
+
+# Tests and development
+*.test.ts
+*.spec.ts
+coverage/
+.nyc_output/
+
+# Git and CI
+.git/
+.github/
+.gitignore
+.gitattributes
+.gitconfig
+.husky/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Lock files
+bun.lock
+bun.lockb
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+skills-lock.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+.temp/
+temp/
+
+# Development
+README.dev.md
+CONTRIBUTING.md
+
+# Documentation
+docs/
+
+# Zip files
+*.zip
+
+# Agents
+.agents/
+.claude/
+.cursor/
+.codex/
+
+# Enviroments
+.env
+.env.local
+.env.*.local
+.env.example
+CLAUDE.md
+AGENTS.md
