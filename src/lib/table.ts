@@ -39,6 +39,7 @@ export function printTable(repos: StarredRepo[], t: Messages): void {
   let nameWidth = stringWidth(t.tableRepo);
   let langWidth = stringWidth(t.tableLang);
   let starsWidth = stringWidth(t.tableStars);
+  let forksWidth = stringWidth(t.tableForks);
   let dateWidth = stringWidth(t.tableUpdated);
 
   for (const repo of repos) {
@@ -46,6 +47,8 @@ export function printTable(repos: StarredRepo[], t: Messages): void {
     langWidth = Math.max(langWidth, repo.language ? repo.language.length : 'unknown'.length);
     const starsRaw = repo.stargazers_count.toLocaleString();
     starsWidth = Math.max(starsWidth, starsRaw.length + 2);
+    const forksRaw = repo.forks_count.toLocaleString();
+    forksWidth = Math.max(forksWidth, forksRaw.length + 2);
     dateWidth = Math.max(dateWidth, formatDate(repo.updated_at).length);
   }
 
@@ -56,9 +59,10 @@ export function printTable(repos: StarredRepo[], t: Messages): void {
   const headerName = padRaw(t.tableRepo, chalk.bold(t.tableRepo), nameWidth);
   const headerLang = padRaw(t.tableLang, chalk.bold(t.tableLang), langWidth);
   const headerStars = padRaw(t.tableStars, chalk.bold(t.tableStars), starsWidth);
+  const headerForks = padRaw(t.tableForks, chalk.bold(t.tableForks), forksWidth);
   const headerDate = chalk.bold(t.tableUpdated);
   console.log(
-    `  ${headerNum}${gap}${headerName}${gap}${headerLang}${gap}${headerStars}${gap}${headerDate}`,
+    `  ${headerNum}${gap}${headerName}${gap}${headerLang}${gap}${headerStars}${gap}${headerForks}${gap}${headerDate}`,
   );
 
   const sepWidth =
@@ -69,6 +73,8 @@ export function printTable(repos: StarredRepo[], t: Messages): void {
     langWidth +
     gap.length +
     starsWidth +
+    gap.length +
+    forksWidth +
     gap.length +
     dateWidth;
   console.log(`  ${chalk.dim('─'.repeat(sepWidth))}`);
@@ -92,11 +98,19 @@ export function printTable(repos: StarredRepo[], t: Messages): void {
       starsWidth,
     );
 
+    const forksCount = repo.forks_count.toLocaleString();
+    const forksRaw = `⎇ ${forksCount}`;
+    const forksColored = padRaw(
+      forksRaw,
+      `${chalk.magenta('⎇')} ${chalk.magenta(forksCount)}`,
+      forksWidth,
+    );
+
     const dateRaw = formatDate(repo.updated_at);
     const dateColored = chalk.dim(dateRaw);
 
     console.log(
-      `  ${numColored}${gap}${nameColored}${gap}${langColored}${gap}${starsColored}${gap}${dateColored}`,
+      `  ${numColored}${gap}${nameColored}${gap}${langColored}${gap}${starsColored}${gap}${forksColored}${gap}${dateColored}`,
     );
   });
 

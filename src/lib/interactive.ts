@@ -252,7 +252,10 @@ export async function selectMultipleRepos(
 
 export type ListAction = 'browser' | 'clipboard' | 'unstar';
 
-export async function selectMultipleStarredRepos(repos: StarredRepo[]): Promise<StarredRepo[]> {
+export async function selectMultipleStarredRepos(
+  repos: StarredRepo[],
+  preSelected?: string[],
+): Promise<StarredRepo[]> {
   return customMultiselect(
     repos,
     'Select repositories (space=toggle, i=desc, enter=confirm):',
@@ -261,7 +264,11 @@ export async function selectMultipleStarredRepos(repos: StarredRepo[]): Promise<
       colorizeLanguage(repo.language) +
       '  ' +
       chalk.yellow('★') +
-      chalk.green(String(repo.stargazers_count)),
+      chalk.green(String(repo.stargazers_count)) +
+      '  ' +
+      chalk.magenta('⎇') +
+      chalk.magenta(String(repo.forks_count)),
+    preSelected,
   );
 }
 

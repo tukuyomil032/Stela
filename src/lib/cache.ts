@@ -17,7 +17,13 @@ export function loadCache(): CacheData | null {
     return null;
   }
   const raw = readFileSync(CACHE_PATH, 'utf-8');
-  return JSON.parse(raw) as CacheData;
+  const data = JSON.parse(raw) as CacheData;
+  for (const repo of data.repos) {
+    if ((repo as StarredRepo & { forks_count?: number }).forks_count === undefined) {
+      (repo as StarredRepo & { forks_count?: number }).forks_count = 0;
+    }
+  }
+  return data;
 }
 
 export function saveCache(repos: StarredRepo[]): void {
