@@ -54,7 +54,7 @@ export async function searchCommand(
     });
     repos = result.items;
     totalCount = result.totalCount;
-    spinner.succeed(t.searchFound(repos.length));
+    spinner.succeed(t.searchFound(totalCount));
   } catch (e) {
     spinner.fail(t.searchFailed);
     throw e;
@@ -81,7 +81,7 @@ export async function searchCommand(
 
   // Pagination loop
   let currentPage = 1;
-  const perPage = options.limit ?? 30;
+  const perPage = options.limit ?? config.pageSize;
   const allSelected: SearchRepo[] = [];
   const selectedNames = new Set<string>();
   let currentRepos = repos;
@@ -89,6 +89,12 @@ export async function searchCommand(
   pageCache.set(1, { items: repos, totalCount });
 
   while (true) {
+    if (selectedNames.size > 0) {
+      console.log(
+        chalk.cyan(`  ✓ 選択済み ${selectedNames.size} 件: `) +
+          chalk.dim(Array.from(selectedNames).join(', ')),
+      );
+    }
     printSearchTable(currentRepos, t);
     console.log(chalk.dim(t.paginationInfo(currentPage, selectedNames.size)));
 
@@ -144,7 +150,7 @@ export async function searchCommand(
           });
           currentRepos = result.items;
           totalCount = result.totalCount;
-          pageSpinner.succeed(t.searchFound(currentRepos.length));
+          pageSpinner.succeed(t.searchFound(totalCount));
         } catch (e) {
           pageSpinner.fail(t.searchFailed);
           throw e;

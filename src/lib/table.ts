@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import gradient from 'gradient-string';
+import stringWidth from 'string-width';
 import type { SearchRepo, StarredRepo } from '../types/github.js';
 import type { Messages } from './i18n.js';
 import { colorizeLanguage } from './languageColors.js';
@@ -13,7 +14,7 @@ function formatDate(dateString: string): string {
 }
 
 function padRaw(rawStr: string, coloredStr: string, width: number): string {
-  const padding = Math.max(0, width - rawStr.length);
+  const padding = Math.max(0, width - stringWidth(rawStr));
   return coloredStr + ' '.repeat(padding);
 }
 
@@ -35,10 +36,10 @@ export function printTable(repos: StarredRepo[], t: Messages): void {
   printBox(`★ ${t.tableHeader(repos.length)}`);
   console.log('');
 
-  let nameWidth = t.tableRepo.length;
-  let langWidth = t.tableLang.length;
-  let starsWidth = t.tableStars.length;
-  let dateWidth = t.tableUpdated.length;
+  let nameWidth = stringWidth(t.tableRepo);
+  let langWidth = stringWidth(t.tableLang);
+  let starsWidth = stringWidth(t.tableStars);
+  let dateWidth = stringWidth(t.tableUpdated);
 
   for (const repo of repos) {
     nameWidth = Math.max(nameWidth, repo.full_name.length);
@@ -110,14 +111,14 @@ export function printSearchTable(repos: SearchRepo[], t: Messages, highlightTop?
   }
 
   console.log('');
-  printBox(`🔍 ${t.tableSearchHeader(repos.length)}`);
+  printBox(`🔍 ${t.tableSearchHeader}`);
   console.log('');
 
-  let nameWidth = t.tableRepo.length;
-  let langWidth = t.tableLang.length;
-  let starsWidth = t.tableStars.length;
-  let forksWidth = t.tableForks.length;
-  let dateWidth = t.tableUpdated.length;
+  let nameWidth = stringWidth(t.tableRepo);
+  let langWidth = stringWidth(t.tableLang);
+  let starsWidth = stringWidth(t.tableStars);
+  let forksWidth = stringWidth(t.tableForks);
+  let dateWidth = stringWidth(t.tableUpdated);
 
   for (const repo of repos) {
     nameWidth = Math.max(nameWidth, repo.full_name.length);

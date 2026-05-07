@@ -1,5 +1,4 @@
 import chalk from 'chalk';
-import { Presets, SingleBar } from 'cli-progress';
 import ora from 'ora';
 import { isCacheValid, loadCache, saveCache } from '../lib/cache.js';
 import { loadConfig } from '../lib/config.js';
@@ -35,24 +34,15 @@ export async function listCommand(options: ListOptions): Promise<void> {
   } else {
     const { getToken } = await import('../lib/auth.js');
     const token = getToken();
-    const bar = new SingleBar(
-      {
-        format: `${t.listFetching} {value}`,
-        hideCursor: true,
-      },
-      Presets.shades_grey,
-    );
-
-    bar.start(Number.MAX_SAFE_INTEGER, 0);
+    const fetchSpinner = ora(t.listFetching).start();
     try {
       repos = await fetchAllStarred(token, (fetched) => {
-        bar.update(fetched);
+        fetchSpinner.text = `${t.listFetching} ${fetched}`;
       });
       saveCache(repos);
-      bar.stop();
-      console.log(chalk.green(t.listFetched(repos.length)));
+      fetchSpinner.succeed(chalk.green(t.listFetched(repos.length)));
     } catch (e) {
-      bar.stop();
+      fetchSpinner.fail();
       throw e;
     }
   }
@@ -119,6 +109,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
   if (action === 'browser') {
     for (const repo of selected) {
       openInBrowser(repo.html_url);
+      console.log(chalk.green('✓ ') + chalk.cyan(repo.html_url));
     }
   } else if (action === 'clipboard') {
     const urls = selected.map((r) => r.html_url).join('\n');

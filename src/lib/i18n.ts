@@ -72,7 +72,7 @@ export type Messages = {
   tableUpdated: string;
   tableForks: string;
   tableHeader: (n: number) => string;
-  tableSearchHeader: (n: number) => string;
+  tableSearchHeader: string;
   errorNoToken: string;
   errorTokenFailed: string;
   paginationPrompt: (page: number) => string;
@@ -156,7 +156,7 @@ const en: Messages = {
   tableUpdated: 'Updated',
   tableForks: 'Forks',
   tableHeader: (n) => `Starred Repositories (${n} total)`,
-  tableSearchHeader: (n) => `Search Results (${n} total)`,
+  tableSearchHeader: 'Search Results',
   errorNoToken: 'GitHub token not found. Run: stela config set token <your-token>',
   errorTokenFailed: 'GitHub token authentication failed.',
   paginationPrompt: (page) => `Page ${page} — Choose an action:`,
@@ -240,7 +240,7 @@ const ja: Messages = {
   tableUpdated: '更新日',
   tableForks: 'フォーク',
   tableHeader: (n) => `スター済みリポジトリ (${n} 件)`,
-  tableSearchHeader: (n) => `検索結果 (${n} 件)`,
+  tableSearchHeader: '検索結果',
   errorNoToken: 'GitHub トークンが見つかりません。実行: stela config set token <your-token>',
   errorTokenFailed: 'GitHub トークンの認証に失敗しました。',
   paginationPrompt: (page) => `ページ ${page} — アクションを選択:`,
