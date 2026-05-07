@@ -1,0 +1,30 @@
+name: Publish package to GitHub Packages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout Repository
+      - uses: oven-sh/setup-bun@v2
+        name: Setup Bun
+        with:
+          bun-version: "latest"
+      - name: Setup .npmrc file to publish to GitHub Packages
+        env:
+          AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "//npm.pkg.github.com/:_authToken=${AUTH_TOKEN}" > ~/.npmrc
+      - run: bun install --frozen-lockfile
+        name: Install Dependencies
+      - run: bun publish
+        name: Publish to GitHub Packages
+
