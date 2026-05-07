@@ -75,6 +75,12 @@ export type Messages = {
   tableSearchHeader: (n: number) => string;
   errorNoToken: string;
   errorTokenFailed: string;
+  paginationPrompt: (page: number) => string;
+  paginationSelect: string;
+  paginationNext: string;
+  paginationPrev: string;
+  paginationDone: string;
+  paginationInfo: (page: number, selected: number) => string;
 };
 
 const en: Messages = {
@@ -104,18 +110,18 @@ const en: Messages = {
   wizardModePreset: 'Use a preset',
   wizardModeCustom: 'Custom search',
   wizardQueryPrompt: 'Search query:',
-  wizardLangPrompt: 'Filter by language (leave blank for any):',
+  wizardLangPrompt: 'Filter by languages (type to search, space to toggle):',
   wizardSortFieldPrompt: 'Sort by:',
   wizardSortOrderPrompt: 'Sort order:',
   wizardSort2Prompt: 'Add secondary sort? (optional)',
-  wizardLimitPrompt: 'Maximum results:',
+  wizardLimitPrompt: 'Maximum results per page:',
   wizardPresetPrompt: 'Choose a preset:',
   wizardPresetHotNew: 'Hot & New — recently updated, high stars',
   wizardPresetClassic: 'Classic — most stars',
   wizardPresetRecent: 'Recent — recently updated',
   wizardPresetHiddenGems: 'Hidden Gems — high stars, low forks',
   listWizardSortPrompt: 'Sort starred repos by:',
-  listWizardLangPrompt: 'Filter by language (leave blank for any):',
+  listWizardLangPrompt: 'Filter by languages (type to search, space to toggle):',
   listWizardSortStars: 'Stars',
   listWizardSortUpdated: 'Last updated',
   listWizardSortDefault: 'Default (starred date)',
@@ -153,6 +159,12 @@ const en: Messages = {
   tableSearchHeader: (n) => `Search Results (${n} total)`,
   errorNoToken: 'GitHub token not found. Run: stela config set token <your-token>',
   errorTokenFailed: 'GitHub token authentication failed.',
+  paginationPrompt: (page) => `Page ${page} — Choose an action:`,
+  paginationSelect: 'Select repos from this page',
+  paginationNext: 'Next page →',
+  paginationPrev: '← Previous page',
+  paginationDone: 'Done (confirm selections)',
+  paginationInfo: (page, selected) => `  Page ${page} | ${selected} repo(s) selected`,
 };
 
 const ja: Messages = {
@@ -182,18 +194,18 @@ const ja: Messages = {
   wizardModePreset: 'プリセットを使用',
   wizardModeCustom: 'カスタム検索',
   wizardQueryPrompt: '検索クエリ:',
-  wizardLangPrompt: '言語フィルター (空白で全言語):',
+  wizardLangPrompt: '言語フィルター (入力で検索、スペースで切替):',
   wizardSortFieldPrompt: 'ソート項目:',
   wizardSortOrderPrompt: 'ソート順:',
   wizardSort2Prompt: 'セカンダリソートを追加？ (任意)',
-  wizardLimitPrompt: '最大取得件数:',
+  wizardLimitPrompt: '1ページあたりの最大表示件数:',
   wizardPresetPrompt: 'プリセットを選択:',
   wizardPresetHotNew: 'ホット & 新着 — 最近更新、スター多め',
   wizardPresetClassic: 'クラシック — スター数順',
   wizardPresetRecent: '最近更新 — 更新日順',
   wizardPresetHiddenGems: '隠れた名作 — スター多・フォーク少',
   listWizardSortPrompt: 'スター済みリポジトリのソート:',
-  listWizardLangPrompt: '言語フィルター (空白で全言語):',
+  listWizardLangPrompt: '言語フィルター (入力で検索、スペースで切替):',
   listWizardSortStars: 'スター数',
   listWizardSortUpdated: '最終更新日',
   listWizardSortDefault: 'デフォルト (スター日順)',
@@ -231,6 +243,12 @@ const ja: Messages = {
   tableSearchHeader: (n) => `検索結果 (${n} 件)`,
   errorNoToken: 'GitHub トークンが見つかりません。実行: stela config set token <your-token>',
   errorTokenFailed: 'GitHub トークンの認証に失敗しました。',
+  paginationPrompt: (page) => `ページ ${page} — アクションを選択:`,
+  paginationSelect: 'このページからリポジトリを選択',
+  paginationNext: '次のページ →',
+  paginationPrev: '← 前のページ',
+  paginationDone: '完了 (選択を確定)',
+  paginationInfo: (page, selected) => `  ページ ${page} | ${selected} 件選択済み`,
 };
 
 export function createI18n(lang: Lang): Messages {
