@@ -18,7 +18,7 @@ import type { StarredRepo } from '../types/github.js';
 
 interface ListOptions {
   interactive: boolean;
-  lang?: string;
+  lang?: string | string[];
   sort?: string;
   refresh: boolean;
 }
@@ -58,7 +58,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
   }
 
   if (!options.lang && !options.sort && options.interactive) {
-    const wizardResult = await listWizard(t);
+    const wizardResult = await listWizard(t, repos);
     if (wizardResult === null) {
       console.log(t.aborted);
       return;
@@ -68,8 +68,10 @@ export async function listCommand(options: ListOptions): Promise<void> {
   }
 
   if (options.lang) {
-    const lang = options.lang.toLowerCase();
-    repos = repos.filter((r) => r.language?.toLowerCase() === lang);
+    const langs = Array.isArray(options.lang)
+      ? options.lang.map((l) => l.toLowerCase())
+      : [options.lang.toLowerCase()];
+    repos = repos.filter((r) => r.language && langs.includes(r.language.toLowerCase()));
   }
 
   if (options.sort === 'stars') {

@@ -67,33 +67,86 @@ export async function starRepo(token: string, owner: string, repo: string): Prom
 export async function searchRepos(
   token: string,
   query: string,
-  options: { lang?: string; sort?: string; limit?: number },
-): Promise<SearchRepo[]> {
-  let searchQuery = query;
-  if (options.lang) {
-    searchQuery += ` language:${options.lang}`;
-  }
-
+  options: { lang?: string | string[]; sort?: string; limit?: number; page?: number },
+): Promise<{ items: SearchRepo[]; totalCount: number }> {
+  const langs = options.lang
+    ? Array.isArray(options.lang)
+      ? options.lang
+      : [options.lang]
+    : [undefined];
   const perPage = Math.min(options.limit ?? 30, 100);
   const sort = options.sort ?? 'stars';
+  const page = options.page ?? 1;
 
-  const params = new URLSearchParams({
-    q: searchQuery,
-    sort,
-    order: 'desc',
-    per_page: String(perPage),
-  });
+  if (langs.length <= 1) {
+    let searchQuery = query;
+    if (langs[0]) searchQuery += ` language:${langs[0]}`;
 
-  const res = await fetch(`${BASE_URL}/search/repositories?${params}`, {
-    headers: headers(token),
-  });
+    const params = new URLSearchParams({
+      q: searchQuery,
+      sort,
+      order: 'desc',
+      per_page: String(perPage),
+      page: String(page),
+    });
 
-  if (!res.ok) {
-    exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
+    const res = await fetch(`${BASE_URL}/search/repositories?${params}`, {
+      headers: headers(token),
+    });
+
+    if (!res.ok) {
+      exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = (await res.json()) as SearchResult;
+    return { items: data.items.slice(0, perPage), totalCount: data.total_count };
   }
 
-  const data = (await res.json()) as SearchResult;
-  return data.items.slice(0, options.limit ?? 30);
+  const seen = new Set<number>();
+  const merged: SearchRepo[] = [];
+  let maxTotalCount = 0;
+
+  for (const lang of langs) {
+    let searchQuery = query;
+    if (lang) searchQuery += ` language:${lang}`;
+
+    const params = new URLSearchParams({
+      q: searchQuery,
+      sort,
+      order: 'desc',
+      per_page: String(perPage),
+      page: String(page),
+    });
+
+    const res = await fetch(`${BASE_URL}/search/repositories?${params}`, {
+      headers: headers(token),
+    });
+
+    if (!res.ok) {
+      exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
+    }
+
+    const data = (await res.json()) as SearchResult;
+    maxTotalCount = Math.max(maxTotalCount, data.total_count);
+
+    for (const item of data.items) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        merged.push(item);
+      }
+    }
+  }
+
+  merged.sort((a, b) => {
+    if (sort === 'stars') return b.stargazers_count - a.stargazers_count;
+    if (sort === 'forks') return b.forks_count - a.forks_count;
+    if (sort === 'updated') {
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    }
+    return b.stargazers_count - a.stargazers_count;
+  });
+
+  return { items: merged.slice(0, perPage), totalCount: maxTotalCount };
 }
 
 export async function fetchLanguages(
