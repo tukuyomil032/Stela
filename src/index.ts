@@ -1,5 +1,7 @@
 #!/usr/bin/env node
+import { intro } from '@clack/prompts';
 import { Command } from 'commander';
+import { renderFilled } from 'oh-my-logo';
 import { cacheClearCommand, cacheStatusCommand, cacheWizardCommand } from './commands/cache.js';
 import { configSetCommand, configShowCommand, configWizardCommand } from './commands/config.js';
 import { listCommand } from './commands/list.js';
@@ -99,5 +101,11 @@ configCommand
   });
 
 program.addCommand(configCommand);
+
+program.action(async () => {
+  await renderFilled('STELA', { palette: 'grad-blue' });
+  intro('stela — GitHub Star Manager');
+  program.help();
+});
 
 program.parse(process.argv);

@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import gradient from 'gradient-string';
 import type { SearchRepo, StarredRepo } from '../types/github.js';
 import type { Messages } from './i18n.js';
 import { colorizeLanguage } from './languageColors.js';
@@ -19,9 +20,9 @@ function padRaw(rawStr: string, coloredStr: string, width: number): string {
 function printBox(title: string): void {
   const inner = `  ${title}  `;
   const line = '═'.repeat(inner.length);
-  console.log(chalk.bold.cyan(`╔${line}╗`));
-  console.log(chalk.bold.cyan(`║${inner}║`));
-  console.log(chalk.bold.cyan(`╚${line}╝`));
+  console.log(gradient.cristal(`╔${line}╗`));
+  console.log(gradient.cristal(`║${inner}║`));
+  console.log(gradient.cristal(`╚${line}╝`));
 }
 
 export function printTable(repos: StarredRepo[], t: Messages): void {
