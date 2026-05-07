@@ -55,6 +55,7 @@ async function customMultiselect<T extends { full_name: string; description: str
   let scrollTop = 0;
 
   if (process.stdin.isTTY) {
+    process.stdin.resume();
     readline.emitKeypressEvents(process.stdin);
     process.stdin.setRawMode(true);
   }
@@ -146,7 +147,10 @@ async function customMultiselect<T extends { full_name: string; description: str
   return new Promise((resolve) => {
     function cleanup(): void {
       process.stdin.removeListener('keypress', onKeypress);
-      if (process.stdin.isTTY) process.stdin.setRawMode(false);
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+      }
     }
 
     function onKeypress(str: string, key: readline.Key): void {
