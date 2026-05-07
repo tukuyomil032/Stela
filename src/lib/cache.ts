@@ -30,7 +30,9 @@ export function saveCache(repos: StarredRepo[]): void {
 
 export function isCacheValid(ttlMinutes: number): boolean {
   const cache = loadCache();
-  if (!cache) return false;
+  if (!cache) {
+    return false;
+  }
   const fetchedAt = new Date(cache.fetchedAt).getTime();
   const now = Date.now();
   return now - fetchedAt < ttlMinutes * 60 * 1000;
