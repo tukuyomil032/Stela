@@ -6,27 +6,79 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
-  build:
+  check_version:
+    name: Check Version & Tag
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      version: ${{ steps.package_version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-        name: Checkout Repository
-      - uses: oven-sh/setup-bun@v2
-        name: Setup Bun
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Get version from package.json
+        id: package_version
+        run: |
+          VERSION=$(jq -r .version package.json)
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Current package.json version is v$VERSION"
+
+      - name: Check if tag exists
+        id: check
+        run: |
+          TAG=${{ steps.package_version.outputs.version }}
+          # Check if the tag already exists in the remote repository
+          EXISTS=$(git ls-remote --tags origin refs/tags/$TAG)
+
+          if [ -z "$EXISTS" ]; then
+            echo "Tag $TAG does not exist. Proceeding with publish."
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tag $TAG already exists. Skipping publish."
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          fi
+
+  publish:
+    name: Publish and Release
+    needs: check_version
+    if: needs.check_version.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: "latest"
-      - name: Setup .npmrc file to publish to GitHub Packages
+
+      - name: Setup .npmrc
         env:
           AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "@tukuyomil032:registry=https://npm.pkg.github.com" > .npmrc
           echo "//npm.pkg.github.com/:_authToken=${AUTH_TOKEN}" >> .npmrc
-      - run: bun install --frozen-lockfile
-        name: Install Dependencies
-      - run: bun publish
-        name: Publish to GitHub Packages
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Publish to GitHub Packages
+        run: bun publish
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ needs.check_version.outputs.version }}
+          git push origin ${{ needs.check_version.outputs.version }}
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create ${{ needs.check_version.outputs.version }} --generate-notes
 
