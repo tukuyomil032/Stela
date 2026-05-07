@@ -16,6 +16,5 @@
 
 ## 依存パッケージ
 
-使用するパッケージ: `commander`, `inquirer`, `chalk`, `ora`, `cli-progress`
+使用するパッケージ: `commander`, `@clack/prompts`, `chalk`, `ora`, `cli-progress`, `gradient-string`, `oh-my-logo`
 
-> `yargs` は `package.json` に含まれているが `commander` と重複するため削除対象。
