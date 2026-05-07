@@ -27,7 +27,7 @@ export async function searchCommand(
   const token = getToken();
 
   if (query === undefined && options.interactive) {
-    const result = await searchWizard(t);
+    const result = await searchWizard(t, config.pageSize);
     if (!result) {
       console.log(t.aborted);
       return;
@@ -184,15 +184,17 @@ export async function searchCommand(
     return;
   }
 
-  for (const repo of allSelected) {
+  for (let i = 0; i < allSelected.length; i++) {
+    const repo = allSelected[i];
     const parts = repo.full_name.split('/');
     const owner = parts[0];
     const repoName = parts[1];
 
-    const repoSpinner = ora(t.searchStarring(repo.full_name)).start();
+    const label = t.searchStarring(repo.full_name, i + 1, allSelected.length);
+    const repoSpinner = ora(label).start();
     try {
       await starRepo(token, owner, repoName);
-      repoSpinner.succeed(t.searchStarring(repo.full_name));
+      repoSpinner.succeed(label);
     } catch (e) {
       repoSpinner.fail(`Failed to star ${repo.full_name}`);
       throw e;

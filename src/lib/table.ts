@@ -187,16 +187,18 @@ export function printSearchTable(repos: SearchRepo[], t: Messages, highlightTop?
     );
     const dateColored = chalk.dim(dateRaw);
 
-    const line = `  ${numColored}${gap}${nameColored}${gap}${langColored}${gap}${starsColored}${gap}${forksColored}${gap}${dateColored}`;
+    const pfx = rank <= 3 && rank <= top ? '◆ ' : '  ';
+    const content = `${numColored}${gap}${nameColored}${gap}${langColored}${gap}${starsColored}${gap}${forksColored}${gap}${dateColored}`;
+    const fullLine = `${pfx}${content}`;
 
     if (rank <= 3 && rank <= top) {
-      console.log(`${chalk.bold.yellow(line)} ◆`);
+      console.log(chalk.bold.yellow(fullLine));
     } else if (rank <= 6 && rank <= top) {
-      console.log(chalk.bold(line));
+      console.log(chalk.bold(fullLine));
     } else if (rank <= 10 && rank <= top) {
-      console.log(chalk.white(line));
+      console.log(chalk.white(fullLine));
     } else {
-      console.log(line);
+      console.log(fullLine);
     }
   });
 

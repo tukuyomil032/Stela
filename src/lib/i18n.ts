@@ -20,7 +20,7 @@ export type Messages = {
   searchFound: (n: number) => string;
   searchFailed: string;
   searchSelectPrompt: string;
-  searchStarring: (name: string) => string;
+  searchStarring: (name: string, current: number, total: number) => string;
   searchStarred: (n: number) => string;
   searchNoQuery: string;
   wizardModePrompt: string;
@@ -103,7 +103,7 @@ const en: Messages = {
   searchFound: (n) => `Found ${n} repositories.`,
   searchFailed: 'Search failed.',
   searchSelectPrompt: 'Select repositories to star:',
-  searchStarring: (name) => `Starring ${name}...`,
+  searchStarring: (name, current, total) => `Starring repo:${name} [${current}/${total}]`,
   searchStarred: (n) => `Starred ${n} repositories.`,
   searchNoQuery: 'No query provided.',
   wizardModePrompt: 'How would you like to search?',
@@ -187,7 +187,7 @@ const ja: Messages = {
   searchFound: (n) => `${n} 件見つかりました。`,
   searchFailed: '検索に失敗しました。',
   searchSelectPrompt: 'スターを付けるリポジトリを選択:',
-  searchStarring: (name) => `${name} にスターを付け中...`,
+  searchStarring: (name, current, total) => `Starring repo:${name} [${current}/${total}]`,
   searchStarred: (n) => `${n} 件にスターを付けました。`,
   searchNoQuery: 'クエリが指定されていません。',
   wizardModePrompt: '検索方法を選択してください:',

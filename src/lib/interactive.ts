@@ -1,18 +1,199 @@
+import * as readline from 'node:readline';
 import {
   autocompleteMultiselect,
   confirm as clackConfirm,
   intro,
   isCancel,
-  multiselect,
   select,
   text,
 } from '@clack/prompts';
 import chalk from 'chalk';
 import gradient from 'gradient-string';
+import stringWidth from 'string-width';
 import type { SearchRepo, StarredRepo } from '../types/github.js';
 import type { Messages } from './i18n.js';
 import { colorizeLanguage, LANGUAGE_COLORS } from './languageColors.js';
 import type { MultiSortConfig, SortCriteria, SortField, SortOrder, SortPreset } from './sort.js';
+
+function wrapText(text: string, maxWidth: number): string[] {
+  if (stringWidth(text) <= maxWidth) return [text];
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    if (current === '') {
+      current = word;
+    } else if (stringWidth(current) + 1 + stringWidth(word) <= maxWidth) {
+      current += ` ${word}`;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+async function customMultiselect<T extends { full_name: string; description: string | null }>(
+  items: T[],
+  message: string,
+  renderLabel: (item: T, idx: number) => string,
+  preSelected?: string[],
+): Promise<T[]> {
+  const selected = new Set<number>(
+    preSelected
+      ? items
+          .map((item, i) => (preSelected.includes(item.full_name) ? i : -1))
+          .filter((i) => i !== -1)
+      : [],
+  );
+
+  let cursor = 0;
+  let showDesc = false;
+  let linesRendered = 0;
+  const maxVisible = Math.min(items.length, 15);
+  let scrollTop = 0;
+
+  if (process.stdin.isTTY) {
+    readline.emitKeypressEvents(process.stdin);
+    process.stdin.setRawMode(true);
+  }
+
+  function clearRendered(): void {
+    if (linesRendered > 0) {
+      process.stdout.moveCursor(0, -linesRendered);
+      process.stdout.clearScreenDown();
+    }
+  }
+
+  function renderList(): void {
+    const lines: string[] = [];
+    lines.push('');
+    lines.push(`  ${chalk.bold(message)}`);
+    lines.push('');
+
+    if (cursor < scrollTop) scrollTop = cursor;
+    if (cursor >= scrollTop + maxVisible) scrollTop = cursor - maxVisible + 1;
+
+    const end = Math.min(scrollTop + maxVisible, items.length);
+    for (let i = scrollTop; i < end; i++) {
+      const item = items[i];
+      const isSelected = selected.has(i);
+      const isCursor = i === cursor;
+
+      const check = isSelected ? chalk.green('[✓]') : chalk.dim('[ ]');
+      const arrow = isCursor ? chalk.cyan('→') : ' ';
+      const label = renderLabel(item, i);
+      lines.push(`  ${arrow} ${check} ${label}`);
+    }
+
+    if (items.length > maxVisible) {
+      lines.push(
+        chalk.dim(
+          `  ... (${scrollTop + 1}-${Math.min(scrollTop + maxVisible, items.length)} / ${items.length})`,
+        ),
+      );
+    }
+
+    lines.push('');
+    lines.push(
+      chalk.dim(
+        `  ${selected.size} selected | ↑↓/jk nav, space toggle, i desc, enter confirm, q cancel`,
+      ),
+    );
+    lines.push('');
+
+    const output = lines.join('\n');
+    process.stdout.write(output);
+    linesRendered = lines.length - 1;
+  }
+
+  function renderDescription(): void {
+    const item = items[cursor];
+    const lines: string[] = [];
+    lines.push('');
+    lines.push(`  ${chalk.bold('Description:')} ${chalk.cyan(item.full_name)}`);
+    lines.push('');
+
+    const rawDesc = item.description ?? '';
+    if (rawDesc) {
+      const wrapped = wrapText(rawDesc, 76);
+      for (const line of wrapped) {
+        lines.push(`  ${line}`);
+      }
+    } else {
+      lines.push(`  ${chalk.dim('(No description.)')}`);
+    }
+
+    lines.push('');
+    lines.push(chalk.dim('  Press i to return'));
+    lines.push('');
+
+    const output = lines.join('\n');
+    process.stdout.write(output);
+    linesRendered = lines.length - 1;
+  }
+
+  function render(): void {
+    clearRendered();
+    if (showDesc) {
+      renderDescription();
+    } else {
+      renderList();
+    }
+  }
+
+  return new Promise((resolve) => {
+    function cleanup(): void {
+      process.stdin.removeListener('keypress', onKeypress);
+      if (process.stdin.isTTY) process.stdin.setRawMode(false);
+    }
+
+    function onKeypress(str: string, key: readline.Key): void {
+      if (!key) return;
+      if (key.ctrl && key.name === 'c') {
+        clearRendered();
+        cleanup();
+        resolve([]);
+        return;
+      }
+
+      if (showDesc) {
+        if (str === 'i' || key.name === 'escape') {
+          showDesc = false;
+          render();
+        }
+        return;
+      }
+
+      if (key.name === 'up' || str === 'k') {
+        cursor = Math.max(0, cursor - 1);
+        render();
+      } else if (key.name === 'down' || str === 'j') {
+        cursor = Math.min(items.length - 1, cursor + 1);
+        render();
+      } else if (str === ' ') {
+        if (selected.has(cursor)) selected.delete(cursor);
+        else selected.add(cursor);
+        render();
+      } else if (str === 'i') {
+        showDesc = true;
+        render();
+      } else if (key.name === 'return') {
+        clearRendered();
+        cleanup();
+        resolve(Array.from(selected).map((i) => items[i]));
+      } else if (key.name === 'escape' || str === 'q') {
+        clearRendered();
+        cleanup();
+        resolve([]);
+      }
+    }
+
+    process.stdin.on('keypress', onKeypress);
+    render();
+  });
+}
 
 function showHeader(): void {
   console.log('');
@@ -49,9 +230,11 @@ export async function selectMultipleRepos(
   repos: SearchRepo[],
   preSelected?: string[],
 ): Promise<SearchRepo[]> {
-  const options = repos.map((repo, idx) => ({
-    label: `${chalk.dim(`#${idx + 1}`)} ${chalk.bold(repo.full_name)}`,
-    hint:
+  return customMultiselect(
+    repos,
+    'Select repositories to star (space=toggle, i=desc, enter=confirm):',
+    (repo, idx) =>
+      `${chalk.dim(`#${idx + 1}`)} ${chalk.bold(repo.full_name)}  ` +
       colorizeLanguage(repo.language) +
       '  ' +
       chalk.yellow('★') +
@@ -59,41 +242,23 @@ export async function selectMultipleRepos(
       '  ' +
       chalk.magenta('⎇') +
       chalk.magenta(String(repo.forks_count)),
-    value: repo.full_name,
-  }));
-
-  const selected = await multiselect({
-    message: 'Select repositories to star (space to toggle, enter to confirm):',
-    options,
-    required: false,
-    initialValues: preSelected,
-  });
-
-  if (isCancel(selected)) return [];
-  return repos.filter((repo) => (selected as string[]).includes(repo.full_name));
+    preSelected,
+  );
 }
 
 export type ListAction = 'browser' | 'clipboard' | 'unstar';
 
 export async function selectMultipleStarredRepos(repos: StarredRepo[]): Promise<StarredRepo[]> {
-  const options = repos.map((repo, idx) => ({
-    label: `${chalk.dim(`#${idx + 1}`)} ${chalk.bold(repo.full_name)}`,
-    hint:
+  return customMultiselect(
+    repos,
+    'Select repositories (space=toggle, i=desc, enter=confirm):',
+    (repo, idx) =>
+      `${chalk.dim(`#${idx + 1}`)} ${chalk.bold(repo.full_name)}  ` +
       colorizeLanguage(repo.language) +
       '  ' +
       chalk.yellow('★') +
       chalk.green(String(repo.stargazers_count)),
-    value: repo.full_name,
-  }));
-
-  const selected = await multiselect({
-    message: 'Select repositories (space to toggle, enter to confirm):',
-    options,
-    required: false,
-  });
-
-  if (isCancel(selected)) return [];
-  return repos.filter((repo) => (selected as string[]).includes(repo.full_name));
+  );
 }
 
 export async function selectListAction(): Promise<ListAction | null> {
@@ -146,7 +311,10 @@ export interface SearchWizardResult {
 
 const ALL_LANGUAGES = Object.keys(LANGUAGE_COLORS).sort();
 
-export async function searchWizard(t: Messages): Promise<SearchWizardResult | null> {
+export async function searchWizard(
+  t: Messages,
+  defaultLimit = 30,
+): Promise<SearchWizardResult | null> {
   showHeader();
 
   const mode = await select({
@@ -161,7 +329,7 @@ export async function searchWizard(t: Messages): Promise<SearchWizardResult | nu
   let multiSort: MultiSortConfig = {};
   let query = '';
   let lang: string[] | undefined;
-  let limit = 30;
+  let limit = defaultLimit;
 
   const langOptions = ALL_LANGUAGES.map((l) => ({ label: colorizeLanguage(l), value: l }));
 
@@ -193,14 +361,14 @@ export async function searchWizard(t: Messages): Promise<SearchWizardResult | nu
 
     const limitResult = await text({
       message: t.wizardLimitPrompt,
-      defaultValue: '30',
+      defaultValue: String(defaultLimit),
       validate: (v) => {
         const n = parseInt(v ?? '', 10);
         if (Number.isNaN(n) || n < 1 || n > 200) return 'Enter a number between 1 and 200';
       },
     });
     if (isCancel(limitResult)) return null;
-    limit = parseInt((limitResult as string) ?? '30', 10);
+    limit = parseInt((limitResult as string) ?? String(defaultLimit), 10);
   } else {
     const queryResult = await text({ message: t.wizardQueryPrompt });
     if (isCancel(queryResult)) return null;
@@ -269,14 +437,14 @@ export async function searchWizard(t: Messages): Promise<SearchWizardResult | nu
 
     const limitResult = await text({
       message: t.wizardLimitPrompt,
-      defaultValue: '30',
+      defaultValue: String(defaultLimit),
       validate: (v) => {
         const n = parseInt(v ?? '', 10);
         if (Number.isNaN(n) || n < 1 || n > 200) return 'Enter a number between 1 and 200';
       },
     });
     if (isCancel(limitResult)) return null;
-    limit = parseInt((limitResult as string) ?? '30', 10);
+    limit = parseInt((limitResult as string) ?? String(defaultLimit), 10);
   }
 
   return { query, lang, limit, multiSort };
