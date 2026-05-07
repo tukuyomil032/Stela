@@ -17,7 +17,7 @@ src/
     github.ts           — GitHub REST API クライアント（fetch ベース）
     cache.ts            — キャッシュ読み書きロジック
     config.ts           — 設定ファイル読み書き
-    interactive.ts      — inquirer UI ロジック（fuzzy リスト）
+    interactive.ts      — @clack/prompts UI ロジック（fuzzy リスト）
     table.ts            — --no-interactive 時のテーブル整形
     error.ts            — エラーハンドリング共通処理
   types/
@@ -66,7 +66,7 @@ lib/auth.ts
 
 1. `lib/cache.ts` でキャッシュ確認 → TTL 内ならそのまま使用
 2. キャッシュミスなら `lib/github.ts` で API 呼び出し（`ora` スピナー表示）
-3. `lib/interactive.ts` で inquirer の fuzzy リストを起動
+3. `lib/interactive.ts` で @clack/prompts の fuzzy リストを起動
 4. 選択後にアクション選択（unstar / open in browser / copy URL）
 5. 確認プロンプト → API 呼び出し → `lib/cache.ts` でキャッシュ更新
 
