@@ -22,7 +22,9 @@ jobs:
       - name: Setup .npmrc file to publish to GitHub Packages
         env:
           AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "//npm.pkg.github.com/:_authToken=${AUTH_TOKEN}" > ~/.npmrc
+        run: |
+          echo "@tukuyomil032:registry=https://npm.pkg.github.com" > .npmrc
+          echo "//npm.pkg.github.com/:_authToken=${AUTH_TOKEN}" >> .npmrc
       - run: bun install --frozen-lockfile
         name: Install Dependencies
       - run: bun publish
