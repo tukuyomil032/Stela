@@ -1,6 +1,31 @@
+<div align="center">
+
 # stela
 
-A TypeScript CLI that lets you view starred repositories, unstar them, and search for repositories by language or genre to star new ones
+**Manage your GitHub starred repositories from the terminal.**
+
+[![npm version](https://img.shields.io/npm/v/@tukuyomil032/stela)](https://www.npmjs.com/package/@tukuyomil032/stela) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![CI](https://github.com/tukuyomil032/stela/actions/workflows/ci.yml/badge.svg)](https://github.com/tukuyomil032/stela/actions/workflows/ci.yml)
+
+</div>
+
+---
+
+Browse, filter, star, unstar, and search GitHub repositories — all without leaving your terminal. Stela provides an interactive TUI with fuzzy selection, language filtering, and clipboard/browser integration, backed by a local cache for fast repeated queries.
+
+## Features
+
+- **Interactive list** — paginated fuzzy picker with multi-select; open in browser or copy URL directly
+- **Star & unstar** — star any `owner/repo` or GitHub URL; bulk-unstar from the interactive list
+- **Search** — query GitHub with full search syntax, filter by language, and star results interactively
+- **Caching** — JSON cache with configurable TTL so repeated `list` calls are instant
+- **Language breakdown** — color-coded language stats using GitHub Linguist colors
+- **i18n** — English and Japanese UI (`config set lang ja`)
+- **No token storage** — authentication delegates to the `gh` CLI; no credentials ever written to disk
+
+## Prerequisites
+
+- Node.js 20+
+- [`gh` CLI](https://cli.github.com/) installed and authenticated (`gh auth login`)
 
 ## Installation
 
@@ -8,8 +33,151 @@ A TypeScript CLI that lets you view starred repositories, unstar them, and searc
 npm install -g @tukuyomil032/stela
 ```
 
-## Usage
+## Quick Start
 
 ```bash
-stela --help
+# Browse your starred repos interactively
+stela list
+
+# Filter by language
+stela list --lang typescript
+
+# Search GitHub and star results
+stela search "awesome cli tools" --lang go
 ```
+
+## Commands
+
+### `stela list`
+
+Browse your starred repositories in an interactive picker.
+
+```
+stela list [options]
+
+Options:
+  --lang <language>   Filter by programming language
+  --sort <field>      Sort by: stars | updated  (default: stars)
+  --refresh           Bypass cache and fetch from GitHub API
+  --no-interactive    Print as a plain table (useful for scripts)
+```
+
+From the interactive picker you can:
+- Open a repository in your browser
+- Copy the URL to clipboard
+- Unstar one or more repositories
+
+### `stela star`
+
+Star a repository by `owner/repo` slug or GitHub URL.
+
+```bash
+stela star cli/cli
+stela star https://github.com/cli/cli
+```
+
+### `stela unstar`
+
+Remove a star from a repository.
+
+```bash
+stela unstar cli/cli        # prompts for confirmation
+stela unstar cli/cli -y     # skip confirmation
+```
+
+### `stela search`
+
+Search GitHub and interactively star results.
+
+```
+stela search [query] [options]
+
+Options:
+  --lang <language>   Filter results by language
+  --sort <field>      Sort by: stars | forks | updated  (default: stars)
+  --limit <n>         Number of results (max 100, default 30)
+  --no-interactive    Print table only; no starring via pipes
+```
+
+```bash
+stela search "react state management" --lang typescript --limit 10
+stela search --no-interactive "rust cli" | head -5
+```
+
+### `stela cache`
+
+Inspect or clear the local starred-repo cache.
+
+```bash
+stela cache status   # show timestamp, TTL remaining, and repo count
+stela cache clear    # delete the cache file
+```
+
+### `stela config`
+
+View and edit persistent settings.
+
+```bash
+stela config show
+stela config set <key> <value>
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `cacheTTL` | number (minutes) | `30` | How long the cache is considered fresh |
+| `pageSize` | number | `30` | Items shown per page in interactive mode |
+| `defaultLanguageFilter` | string[] | `[]` | Language pre-filter applied to `list` |
+| `lang` | `en` \| `ja` | `en` | UI language |
+
+```bash
+stela config set cacheTTL 60
+stela config set lang ja
+stela config set pageSize 50
+```
+
+## Non-interactive Mode
+
+All commands that produce output support `--no-interactive` for use in scripts or pipes. In this mode no prompts are shown and no side effects (starring/unstarring) are performed.
+
+```bash
+stela list --no-interactive --lang rust | grep "tokio"
+```
+
+## Global Options
+
+```
+--no-interactive   Output as plain table
+--no-color         Disable colored output (also respects NO_COLOR env var)
+--version          Show version number
+--help             Show help
+```
+
+## Development
+
+```bash
+# Install dependencies
+bun install
+
+# Run in development mode
+bun run dev
+
+# Type-check
+bun run typecheck
+
+# Lint and format
+bun run biome:fix
+
+# Build
+bun run build
+```
+
+> [!NOTE]
+> The `gh` CLI must be authenticated for development. Run `gh auth login` if you haven't already.
+
+## How It Works
+
+Stela uses the GitHub REST API via native `fetch` — no Octokit or other GitHub SDK. Authentication is handled dynamically by calling `gh auth token` at runtime, so no credentials are stored on disk. Starred repositories are cached at `~/.stela/cache/starred.json` with a configurable TTL (default 30 minutes).
+
+## License
+
+MIT
