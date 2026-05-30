@@ -87,8 +87,15 @@ export async function searchCommand(
   let currentRepos = repos;
   const pageCache = new Map<number, { items: SearchRepo[]; totalCount: number }>();
   pageCache.set(1, { items: repos, totalCount });
+  let firstRender = true;
 
   while (true) {
+    if (!firstRender) {
+      process.stdout.write('\x1b8\x1b[J');
+    }
+    process.stdout.write('\x1b7');
+    firstRender = false;
+
     if (selectedNames.size > 0) {
       console.log(
         chalk.cyan(`  ✓ 選択済み ${selectedNames.size} 件: `) +
