@@ -5,7 +5,14 @@ import { loadConfig } from '../lib/config.js';
 import { searchRepos, starRepo } from '../lib/github.js';
 import { createI18n } from '../lib/i18n.js';
 import { searchWizard, selectMultipleRepos, selectPageAction } from '../lib/interactive.js';
+import {
+  disableMouseTracking,
+  enableMouseTracking,
+  getCurrentRow,
+  parseSgrMouseEvent,
+} from '../lib/mouse.js';
 import type { MultiSortConfig } from '../lib/sort.js';
+import { openInBrowser } from '../lib/system.js';
 import { printSearchTable } from '../lib/table.js';
 import type { SearchRepo } from '../types/github.js';
 
@@ -95,11 +102,38 @@ export async function searchCommand(
           chalk.dim(Array.from(selectedNames).join(', ')),
       );
     }
+
+    // Query cursor row BEFORE printing the table so we can map clicks to repo indices
+    const tableStartRow = await getCurrentRow();
+
     printSearchTable(currentRepos, t);
     console.log(chalk.dim(t.paginationInfo(currentPage, selectedNames.size)));
+    if (process.stdout.isTTY) {
+      console.log(chalk.dim('  Shift+click on a repository name to open in browser'));
+    }
 
     const hasNextPage = currentPage * perPage < totalCount;
+
+    // Enable SGR mouse tracking and listen for Shift+left-click events.
+    // printSearchTable prints 7 lines before repo[0]:
+    //   blank + box(3) + blank + header + separator
+    const REPO_ROW_OFFSET = 7;
+    enableMouseTracking();
+
+    const mouseHandler = (data: Buffer): void => {
+      const event = parseSgrMouseEvent(data.toString());
+      if (!event || event.button !== 0 || !event.shift || event.released) return;
+
+      const repoIndex = event.y - tableStartRow - REPO_ROW_OFFSET;
+      if (repoIndex >= 0 && repoIndex < currentRepos.length) {
+        openInBrowser(`https://github.com/${currentRepos[repoIndex].full_name}`);
+      }
+    };
+
+    process.stdin.on('data', mouseHandler);
     const action = await selectPageAction(t, currentPage, hasNextPage);
+    disableMouseTracking();
+    process.stdin.removeListener('data', mouseHandler);
 
     if (action === null) {
       console.log(t.aborted);
@@ -112,11 +146,9 @@ export async function searchCommand(
         .map((r) => r.full_name);
       const pageSelected = await selectMultipleRepos(currentRepos, preSelected);
 
-      // Update accumulated selections
       const currentPageNames = new Set(currentRepos.map((r) => r.full_name));
       const pageSelectedNames = new Set(pageSelected.map((r) => r.full_name));
 
-      // Remove deselected repos from this page
       for (const name of currentPageNames) {
         if (!pageSelectedNames.has(name) && selectedNames.has(name)) {
           selectedNames.delete(name);
@@ -124,7 +156,6 @@ export async function searchCommand(
           if (idx !== -1) allSelected.splice(idx, 1);
         }
       }
-      // Add newly selected repos
       for (const repo of pageSelected) {
         if (!selectedNames.has(repo.full_name)) {
           selectedNames.add(repo.full_name);
@@ -161,7 +192,6 @@ export async function searchCommand(
           continue;
         }
 
-        // Apply multi-sort if configured
         if (
           options.multiSort &&
           (options.multiSort.preset || (options.multiSort.criteria?.length ?? 0) > 0)
