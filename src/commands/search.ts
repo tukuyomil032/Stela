@@ -5,12 +5,7 @@ import { loadConfig } from '../lib/config.js';
 import { searchRepos, starRepo } from '../lib/github.js';
 import { createI18n } from '../lib/i18n.js';
 import { searchWizard, selectMultipleRepos, selectPageAction } from '../lib/interactive.js';
-import {
-  disableMouseTracking,
-  enableMouseTracking,
-  getCurrentRow,
-  parseSgrMouseEvent,
-} from '../lib/mouse.js';
+import { getCurrentRow } from '../lib/mouse.js';
 import type { MultiSortConfig } from '../lib/sort.js';
 import { openInBrowser } from '../lib/system.js';
 import { printSearchTable } from '../lib/table.js';
@@ -114,26 +109,12 @@ export async function searchCommand(
 
     const hasNextPage = currentPage * perPage < totalCount;
 
-    // Enable SGR mouse tracking and listen for Shift+left-click events.
-    // printSearchTable prints 7 lines before repo[0]:
-    //   blank + box(3) + blank + header + separator
-    const REPO_ROW_OFFSET = 7;
-    enableMouseTracking();
-
-    const mouseHandler = (data: Buffer): void => {
-      const event = parseSgrMouseEvent(data.toString());
-      if (!event || event.button !== 0 || !event.shift || event.released) return;
-
-      const repoIndex = event.y - tableStartRow - REPO_ROW_OFFSET;
+    const action = await selectPageAction(t, currentPage, hasNextPage, (x, y) => {
+      const repoIndex = y - tableStartRow - 7;
       if (repoIndex >= 0 && repoIndex < currentRepos.length) {
         openInBrowser(`https://github.com/${currentRepos[repoIndex].full_name}`);
       }
-    };
-
-    process.stdin.on('data', mouseHandler);
-    const action = await selectPageAction(t, currentPage, hasNextPage);
-    disableMouseTracking();
-    process.stdin.removeListener('data', mouseHandler);
+    });
 
     if (action === null) {
       console.log(t.aborted);
