@@ -293,7 +293,7 @@ export async function selectPageAction(
   t: Messages,
   currentPage: number,
   hasNextPage: boolean,
-  onShiftClick?: (x: number, y: number) => void,
+  onClickRepo?: (x: number, y: number) => void,
 ): Promise<PageAction | null> {
   const options: { label: string; value: PageAction }[] = [
     { label: t.paginationSelect, value: 'select' },
@@ -330,23 +330,22 @@ export async function selectPageAction(
     linesRendered = lines.length - 1;
   }
 
+  process.stdin.resume();
+  readline.emitKeypressEvents(process.stdin);
+  process.stdin.setRawMode(true);
   enableMouseTracking();
-  render();
 
   return new Promise<PageAction | null>((resolve) => {
-    process.stdin.resume();
-    process.stdin.setRawMode(true);
-
     let settled = false;
 
     function cleanup(): void {
       if (settled) return;
       settled = true;
-      process.stdin.removeListener('data', onData);
-      try {
+      process.stdin.removeListener('keypress', onKeypress);
+      process.stdin.removeListener('data', onMouseData);
+      if (process.stdin.isTTY) {
         process.stdin.setRawMode(false);
-      } catch {
-        /* noop */
+        process.stdin.pause();
       }
       disableMouseTracking();
       clearRendered();
@@ -357,48 +356,51 @@ export async function selectPageAction(
       resolve(result);
     }
 
-    function onData(buf: Buffer): void {
-      if (settled) return;
-      const str = buf.toString();
+    function onKeypress(str: string, key: readline.Key): void {
+      if (settled || !key) return;
+      if (parseSgrMouseEvent(str)) return;
 
-      const mouseEvent = parseSgrMouseEvent(str);
-      if (mouseEvent) {
-        if (mouseEvent.button === 0 && mouseEvent.shift && !mouseEvent.released && onShiftClick) {
-          onShiftClick(mouseEvent.x, mouseEvent.y);
-        }
-        return;
-      }
-
-      if (str === '\x03') {
+      if (key.ctrl && key.name === 'c') {
         done(null);
         return;
       }
-      if (str === '\x1b') {
+      if (key.name === 'escape') {
         done(null);
         return;
       }
-      if (str === '\x1b[A') {
+      if (key.name === 'up') {
         cursor = Math.max(0, cursor - 1);
         render();
         return;
       }
-      if (str === '\x1b[B') {
+      if (key.name === 'down') {
         cursor = Math.min(options.length - 1, cursor + 1);
         render();
         return;
       }
-      if (str === '\r' || str === '\n') {
+      if (key.name === 'return') {
         done(options[cursor].value);
         return;
       }
 
-      const num = Number.parseInt(str, 10);
-      if (!Number.isNaN(num) && num >= 1 && num <= options.length) {
-        done(options[num - 1].value);
+      if (str) {
+        const num = Number.parseInt(str, 10);
+        if (!Number.isNaN(num) && num >= 1 && num <= options.length) {
+          done(options[num - 1].value);
+        }
       }
     }
 
-    process.stdin.on('data', onData);
+    function onMouseData(buf: Buffer): void {
+      if (settled) return;
+      const mouseEvent = parseSgrMouseEvent(buf.toString());
+      if (!mouseEvent || mouseEvent.button !== 0 || mouseEvent.released) return;
+      if (onClickRepo) onClickRepo(mouseEvent.x, mouseEvent.y);
+    }
+
+    process.stdin.on('keypress', onKeypress);
+    process.stdin.on('data', onMouseData);
+    render();
   });
 }
 

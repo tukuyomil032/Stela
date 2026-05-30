@@ -104,12 +104,12 @@ export async function searchCommand(
     printSearchTable(currentRepos, t);
     console.log(chalk.dim(t.paginationInfo(currentPage, selectedNames.size)));
     if (process.stdout.isTTY) {
-      console.log(chalk.dim('  Shift+click on a repository name to open in browser'));
+      console.log(chalk.dim('  Click on a repository name to open in browser'));
     }
 
     const hasNextPage = currentPage * perPage < totalCount;
 
-    const action = await selectPageAction(t, currentPage, hasNextPage, (x, y) => {
+    const action = await selectPageAction(t, currentPage, hasNextPage, (_x, y) => {
       const repoIndex = y - tableStartRow - 7;
       if (repoIndex >= 0 && repoIndex < currentRepos.length) {
         openInBrowser(`https://github.com/${currentRepos[repoIndex].full_name}`);
