@@ -35,9 +35,12 @@ export async function getCurrentRow(): Promise<number> {
       process.stdin.setRawMode(true);
     }
 
+    let timer: ReturnType<typeof setTimeout>;
+
     const onData = (data: Buffer): void => {
       const match = DSR_RESPONSE.exec(data.toString());
       if (match) {
+        clearTimeout(timer);
         process.stdin.removeListener('data', onData);
         if (!wasRaw) {
           try {
@@ -53,7 +56,7 @@ export async function getCurrentRow(): Promise<number> {
     process.stdin.on('data', onData);
     process.stdout.write(`${ESC}[6n`);
 
-    setTimeout(() => {
+    timer = setTimeout(() => {
       process.stdin.removeListener('data', onData);
       if (!wasRaw) {
         try {
