@@ -91,10 +91,17 @@ export async function listCommand(options: ListOptions): Promise<void> {
   let currentPage = 1;
   const allSelected: StarredRepo[] = [];
   const selectedNames = new Set<string>();
+  let firstRender = true;
 
   while (true) {
     const startIdx = (currentPage - 1) * perPage;
     const currentRepos = repos.slice(startIdx, startIdx + perPage);
+
+    if (!firstRender) {
+      process.stdout.write('\x1b8\x1b[J');
+    }
+    process.stdout.write('\x1b7');
+    firstRender = false;
 
     if (selectedNames.size > 0) {
       console.log(
