@@ -20,7 +20,7 @@ function padRaw(rawStr: string, coloredStr: string, width: number): string {
 
 function printBox(title: string): void {
   const inner = `  ${title}  `;
-  const line = '═'.repeat(inner.length);
+  const line = '═'.repeat(stringWidth(inner));
   console.log(gradient.cristal(`╔${line}╗`));
   console.log(gradient.cristal(`║${inner}║`));
   console.log(gradient.cristal(`╚${line}╝`));
