@@ -26,6 +26,8 @@ export function disableMouseTracking(): void {
 export async function getCurrentRow(): Promise<number> {
   if (!process.stdout.isTTY || !process.stdin.isTTY) return 1;
 
+  process.stdin.resume();
+
   return new Promise<number>((resolve) => {
     const wasRaw = process.stdin.isRaw ?? false;
 
