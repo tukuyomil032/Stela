@@ -87,14 +87,13 @@ export async function searchCommand(
   let currentRepos = repos;
   const pageCache = new Map<number, { items: SearchRepo[]; totalCount: number }>();
   pageCache.set(1, { items: repos, totalCount });
-  let firstRender = true;
+  let needsClear = false;
 
   while (true) {
-    if (!firstRender) {
-      process.stdout.write('\x1b8\x1b[J');
+    if (needsClear && process.stdout.isTTY) {
+      process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+      needsClear = false;
     }
-    process.stdout.write('\x1b7');
-    firstRender = false;
 
     if (selectedNames.size > 0) {
       console.log(
@@ -103,7 +102,7 @@ export async function searchCommand(
       );
     }
 
-    printSearchTable(currentRepos, t);
+    printSearchTable(currentRepos, t, undefined, (currentPage - 1) * perPage);
     console.log(chalk.dim(t.paginationInfo(currentPage, selectedNames.size)));
 
     const hasNextPage = currentPage * perPage < totalCount;
@@ -137,7 +136,9 @@ export async function searchCommand(
           allSelected.push(repo);
         }
       }
+      needsClear = true;
     } else if (action === 'next' || action === 'prev') {
+      needsClear = true;
       const targetPage = action === 'next' ? currentPage + 1 : currentPage - 1;
 
       const cached = pageCache.get(targetPage);

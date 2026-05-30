@@ -26,7 +26,7 @@ function printBox(title: string): void {
   console.log(gradient.cristal(`╚${line}╝`));
 }
 
-export function printTable(repos: StarredRepo[], t: Messages): void {
+export function printTable(repos: StarredRepo[], t: Messages, startIndex?: number): void {
   if (repos.length === 0) {
     console.log(t.noReposFound);
     return;
@@ -80,7 +80,7 @@ export function printTable(repos: StarredRepo[], t: Messages): void {
   console.log(`  ${chalk.dim('─'.repeat(sepWidth))}`);
 
   repos.forEach((repo, idx) => {
-    const numRaw = String(idx + 1);
+    const numRaw = String((startIndex ?? 0) + idx + 1);
     const numPadded = numRaw.padStart(numWidth);
     const numColored = chalk.dim(numPadded);
 
@@ -118,7 +118,12 @@ export function printTable(repos: StarredRepo[], t: Messages): void {
   console.log(`  Total: ${repos.length} repositories`);
 }
 
-export function printSearchTable(repos: SearchRepo[], t: Messages, highlightTop?: number): void {
+export function printSearchTable(
+  repos: SearchRepo[],
+  t: Messages,
+  highlightTop?: number,
+  startIndex?: number,
+): void {
   if (repos.length === 0) {
     console.log(t.noReposFound);
     return;
@@ -174,7 +179,7 @@ export function printSearchTable(repos: SearchRepo[], t: Messages, highlightTop?
   const top = highlightTop ?? repos.length;
 
   repos.forEach((repo, idx) => {
-    const rank = idx + 1;
+    const rank = (startIndex ?? 0) + idx + 1;
     const numRaw = String(rank);
     const numPadded = numRaw.padStart(numWidth);
     const numColored = chalk.dim(numPadded);

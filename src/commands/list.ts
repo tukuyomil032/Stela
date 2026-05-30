@@ -91,17 +91,16 @@ export async function listCommand(options: ListOptions): Promise<void> {
   let currentPage = 1;
   const allSelected: StarredRepo[] = [];
   const selectedNames = new Set<string>();
-  let firstRender = true;
+  let needsClear = false;
 
   while (true) {
     const startIdx = (currentPage - 1) * perPage;
     const currentRepos = repos.slice(startIdx, startIdx + perPage);
 
-    if (!firstRender) {
-      process.stdout.write('\x1b8\x1b[J');
+    if (needsClear && process.stdout.isTTY) {
+      process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+      needsClear = false;
     }
-    process.stdout.write('\x1b7');
-    firstRender = false;
 
     if (selectedNames.size > 0) {
       console.log(
@@ -110,7 +109,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
       );
     }
 
-    printTable(currentRepos, t);
+    printTable(currentRepos, t, startIdx);
     console.log(chalk.dim(t.paginationInfo(currentPage, selectedNames.size)));
 
     const hasNextPage = currentPage * perPage < repos.length;
@@ -145,10 +144,13 @@ export async function listCommand(options: ListOptions): Promise<void> {
           allSelected.push(repo);
         }
       }
+      needsClear = true;
     } else if (pageAction === 'next') {
       currentPage++;
+      needsClear = true;
     } else if (pageAction === 'prev') {
       currentPage--;
+      needsClear = true;
     } else {
       break;
     }
