@@ -13,6 +13,7 @@ import stringWidth from 'string-width';
 import type { SearchRepo, StarredRepo } from '../types/github.js';
 import type { Messages } from './i18n.js';
 import { colorizeLanguage, LANGUAGE_COLORS } from './languageColors.js';
+import { disableMouseTracking, enableMouseTracking, parseSgrMouseEvent } from './mouse.js';
 import type { MultiSortConfig, SortCriteria, SortField, SortOrder, SortPreset } from './sort.js';
 
 function wrapText(text: string, maxWidth: number): string[] {
@@ -292,25 +293,113 @@ export async function selectPageAction(
   t: Messages,
   currentPage: number,
   hasNextPage: boolean,
+  onShiftClick?: (x: number, y: number) => void,
 ): Promise<PageAction | null> {
   const options: { label: string; value: PageAction }[] = [
     { label: t.paginationSelect, value: 'select' },
   ];
-  if (hasNextPage) {
-    options.push({ label: t.paginationNext, value: 'next' });
-  }
-  if (currentPage > 1) {
-    options.push({ label: t.paginationPrev, value: 'prev' });
-  }
+  if (hasNextPage) options.push({ label: t.paginationNext, value: 'next' });
+  if (currentPage > 1) options.push({ label: t.paginationPrev, value: 'prev' });
   options.push({ label: t.paginationDone, value: 'done' });
 
-  const action = await select({
-    message: t.paginationPrompt(currentPage),
-    options,
-  });
+  if (!process.stdin.isTTY) return null;
 
-  if (isCancel(action)) return null;
-  return action as PageAction;
+  let cursor = 0;
+  let linesRendered = 0;
+
+  function clearRendered(): void {
+    if (linesRendered > 0) {
+      process.stdout.moveCursor(0, -linesRendered);
+      process.stdout.clearScreenDown();
+    }
+  }
+
+  function render(): void {
+    clearRendered();
+    const lines: string[] = [];
+    lines.push('');
+    lines.push(`  ${chalk.cyan('◇')} ${chalk.dim(t.paginationPrompt(currentPage))}`);
+    for (let i = 0; i < options.length; i++) {
+      const active = i === cursor;
+      const dot = active ? chalk.cyan('●') : chalk.dim('○');
+      const label = active ? options[i].label : chalk.dim(options[i].label);
+      lines.push(`  ${dot} ${label}`);
+    }
+    lines.push('');
+    process.stdout.write(lines.join('\n'));
+    linesRendered = lines.length - 1;
+  }
+
+  enableMouseTracking();
+  render();
+
+  return new Promise<PageAction | null>((resolve) => {
+    process.stdin.resume();
+    process.stdin.setRawMode(true);
+
+    let settled = false;
+
+    function cleanup(): void {
+      if (settled) return;
+      settled = true;
+      process.stdin.removeListener('data', onData);
+      try {
+        process.stdin.setRawMode(false);
+      } catch {
+        /* noop */
+      }
+      disableMouseTracking();
+      clearRendered();
+    }
+
+    function done(result: PageAction | null): void {
+      cleanup();
+      resolve(result);
+    }
+
+    function onData(buf: Buffer): void {
+      if (settled) return;
+      const str = buf.toString();
+
+      const mouseEvent = parseSgrMouseEvent(str);
+      if (mouseEvent) {
+        if (mouseEvent.button === 0 && mouseEvent.shift && !mouseEvent.released && onShiftClick) {
+          onShiftClick(mouseEvent.x, mouseEvent.y);
+        }
+        return;
+      }
+
+      if (str === '\x03') {
+        done(null);
+        return;
+      }
+      if (str === '\x1b') {
+        done(null);
+        return;
+      }
+      if (str === '\x1b[A') {
+        cursor = Math.max(0, cursor - 1);
+        render();
+        return;
+      }
+      if (str === '\x1b[B') {
+        cursor = Math.min(options.length - 1, cursor + 1);
+        render();
+        return;
+      }
+      if (str === '\r' || str === '\n') {
+        done(options[cursor].value);
+        return;
+      }
+
+      const num = Number.parseInt(str, 10);
+      if (!Number.isNaN(num) && num >= 1 && num <= options.length) {
+        done(options[num - 1].value);
+      }
+    }
+
+    process.stdin.on('data', onData);
+  });
 }
 
 export interface SearchWizardResult {
