@@ -5,9 +5,7 @@ import { loadConfig } from '../lib/config.js';
 import { searchRepos, starRepo } from '../lib/github.js';
 import { createI18n } from '../lib/i18n.js';
 import { searchWizard, selectMultipleRepos, selectPageAction } from '../lib/interactive.js';
-import { getCurrentRow } from '../lib/mouse.js';
 import type { MultiSortConfig } from '../lib/sort.js';
-import { openInBrowser } from '../lib/system.js';
 import { printSearchTable } from '../lib/table.js';
 import type { SearchRepo } from '../types/github.js';
 
@@ -98,23 +96,12 @@ export async function searchCommand(
       );
     }
 
-    // Query cursor row BEFORE printing the table so we can map clicks to repo indices
-    const tableStartRow = await getCurrentRow();
-
     printSearchTable(currentRepos, t);
     console.log(chalk.dim(t.paginationInfo(currentPage, selectedNames.size)));
-    if (process.stdout.isTTY) {
-      console.log(chalk.dim('  Click on a repository name to open in browser'));
-    }
 
     const hasNextPage = currentPage * perPage < totalCount;
 
-    const action = await selectPageAction(t, currentPage, hasNextPage, (_x, y) => {
-      const repoIndex = y - tableStartRow - 7;
-      if (repoIndex >= 0 && repoIndex < currentRepos.length) {
-        openInBrowser(`https://github.com/${currentRepos[repoIndex].full_name}`);
-      }
-    });
+    const action = await selectPageAction(t, currentPage, hasNextPage);
 
     if (action === null) {
       console.log(t.aborted);

@@ -13,7 +13,6 @@ import stringWidth from 'string-width';
 import type { SearchRepo, StarredRepo } from '../types/github.js';
 import type { Messages } from './i18n.js';
 import { colorizeLanguage, LANGUAGE_COLORS } from './languageColors.js';
-import { disableMouseTracking, enableMouseTracking, parseSgrMouseEvent } from './mouse.js';
 import type { MultiSortConfig, SortCriteria, SortField, SortOrder, SortPreset } from './sort.js';
 
 function wrapText(text: string, maxWidth: number): string[] {
@@ -293,7 +292,6 @@ export async function selectPageAction(
   t: Messages,
   currentPage: number,
   hasNextPage: boolean,
-  onClickRepo?: (x: number, y: number) => void,
 ): Promise<PageAction | null> {
   const options: { label: string; value: PageAction }[] = [
     { label: t.paginationSelect, value: 'select' },
@@ -333,7 +331,6 @@ export async function selectPageAction(
   process.stdin.resume();
   readline.emitKeypressEvents(process.stdin);
   process.stdin.setRawMode(true);
-  enableMouseTracking();
 
   return new Promise<PageAction | null>((resolve) => {
     let settled = false;
@@ -342,12 +339,10 @@ export async function selectPageAction(
       if (settled) return;
       settled = true;
       process.stdin.removeListener('keypress', onKeypress);
-      process.stdin.removeListener('data', onMouseData);
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(false);
         process.stdin.pause();
       }
-      disableMouseTracking();
       clearRendered();
     }
 
@@ -358,7 +353,6 @@ export async function selectPageAction(
 
     function onKeypress(str: string, key: readline.Key): void {
       if (settled || !key) return;
-      if (parseSgrMouseEvent(str)) return;
 
       if (key.ctrl && key.name === 'c') {
         done(null);
@@ -391,15 +385,7 @@ export async function selectPageAction(
       }
     }
 
-    function onMouseData(buf: Buffer): void {
-      if (settled) return;
-      const mouseEvent = parseSgrMouseEvent(buf.toString());
-      if (!mouseEvent || mouseEvent.button !== 0 || mouseEvent.released) return;
-      if (onClickRepo) onClickRepo(mouseEvent.x, mouseEvent.y);
-    }
-
     process.stdin.on('keypress', onKeypress);
-    process.stdin.on('data', onMouseData);
     render();
   });
 }
