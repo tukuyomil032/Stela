@@ -14,6 +14,10 @@ function headers(token: string): Record<string, string> {
 // Session-level in-memory cache for language data
 const languageCache = new Map<string, Record<string, number>>();
 
+// Session-level in-memory caches for README data
+const readmeCache = new Map<string, ReadmeResult>();
+const defaultBranchCache = new Map<string, string>();
+
 export async function fetchAllStarred(
   token: string,
   onPage?: (fetched: number, page: number) => void,
@@ -174,4 +178,88 @@ export async function fetchLanguages(
   const data = (await res.json()) as Record<string, number>;
   languageCache.set(key, data);
   return data;
+}
+
+/**
+ * README fetch outcome.
+ *
+ * A discriminated union rather than `| null` so that callers can tell "this repo
+ * has no README" apart from "the request failed", and show the right message.
+ */
+export type ReadmeResult =
+  | { status: 'ok'; content: string; defaultBranch: string }
+  | { status: 'notFound' }
+  | { status: 'error'; message: string };
+
+/**
+ * Resolve the default branch, used as the base ref for relative image paths.
+ *
+ * Returns null instead of exiting: a failure here only costs us image
+ * resolution, and the caller falls back to the `HEAD` alias.
+ */
+export async function fetchRepoDefaultBranch(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<string | null> {
+  const key = `${owner}/${repo}`;
+  const cached = defaultBranchCache.get(key);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`${BASE_URL}/repos/${owner}/${repo}`, {
+      headers: headers(token),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as { default_branch?: string };
+    const branch = data.default_branch ?? 'main';
+    defaultBranchCache.set(key, branch);
+    return branch;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch a repository README as raw markdown.
+ *
+ * Unlike the other functions in this module, this one never calls
+ * `exitWithError`. It is reached from inside the interactive list, where stdin
+ * is in raw mode; exiting there would leave the terminal without echo.
+ */
+export async function fetchReadme(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<ReadmeResult> {
+  const key = `${owner}/${repo}`;
+  const cached = readmeCache.get(key);
+  if (cached) return cached;
+
+  let result: ReadmeResult;
+  try {
+    const res = await fetch(`${BASE_URL}/repos/${owner}/${repo}/readme`, {
+      // `raw` gives us the markdown directly, with no base64 round trip
+      headers: { ...headers(token), Accept: 'application/vnd.github.raw' },
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (res.status === 404) {
+      result = { status: 'notFound' };
+    } else if (!res.ok) {
+      result = { status: 'error', message: `${res.status} ${res.statusText}` };
+    } else {
+      const content = await res.text();
+      // Only spend a second request once we know a README exists
+      const defaultBranch = (await fetchRepoDefaultBranch(token, owner, repo)) ?? 'HEAD';
+      result = { status: 'ok', content, defaultBranch };
+    }
+  } catch (e) {
+    result = { status: 'error', message: e instanceof Error ? e.message : String(e) };
+  }
+
+  readmeCache.set(key, result);
+  return result;
 }
