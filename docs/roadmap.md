@@ -37,6 +37,7 @@
 
 ## 将来検討（バージョン未定）
 
+- README表示機能（`list`/`search` インタラクティブモードで `r` キー押下→README本文+画像をターミナルプレビュー）。設計は [docs/readme-viewer-design.md](./readme-viewer-design.md) を参照
 - リポジトリのコレクション / タグ管理（GitHub List API 連携）
 - `.stelaignore` による非表示フィルタ
 - shell 補完スクリプト生成（`stela completion`）
