@@ -81,6 +81,11 @@ export type Messages = {
   paginationPrev: string;
   paginationDone: string;
   paginationInfo: (page: number, selected: number) => string;
+  readmeLoading: string;
+  readmeNotFound: string;
+  readmeFailed: string;
+  readmePagerHint: string;
+  readmeDismissHint: string;
 };
 
 const en: Messages = {
@@ -165,6 +170,11 @@ const en: Messages = {
   paginationPrev: '← Previous page',
   paginationDone: 'Done (confirm selections)',
   paginationInfo: (page, selected) => `  Page ${page} | ${selected} repo(s) selected`,
+  readmeLoading: 'Loading README...',
+  readmeNotFound: 'This repository has no README.',
+  readmeFailed: 'Failed to load README.',
+  readmePagerHint: 'jk/↑↓ scroll, space/b page, g/G top/bottom, q close',
+  readmeDismissHint: 'Press any key to return',
 };
 
 const ja: Messages = {
@@ -249,6 +259,11 @@ const ja: Messages = {
   paginationPrev: '← 前のページ',
   paginationDone: '完了 (選択を確定)',
   paginationInfo: (page, selected) => `  ページ ${page} | ${selected} 件選択済み`,
+  readmeLoading: 'README を読み込み中...',
+  readmeNotFound: 'このリポジトリには README がありません。',
+  readmeFailed: 'README の読み込みに失敗しました。',
+  readmePagerHint: 'jk/↑↓ スクロール, space/b ページ送り, g/G 先頭/末尾, q 閉じる',
+  readmeDismissHint: '任意のキーで戻る',
 };
 
 export function createI18n(lang: Lang): Messages {
