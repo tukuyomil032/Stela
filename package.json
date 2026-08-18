@@ -20,6 +20,8 @@
     "dev": "ts-node --esm src/index.ts",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint-staged": "lint-staged",
     "format": "biome format --write .",
     "lint": "biome lint --write .",
@@ -58,9 +60,12 @@
     "cli-progress": "^3.12.0",
     "commander": "^14.0.3",
     "gradient-string": "^3.0.0",
+    "marked": "^15",
+    "marked-terminal": "^7.3.0",
     "oh-my-logo": "^0.4.0",
     "ora": "^9.4.0",
-    "string-width": "^8.2.1"
+    "string-width": "^8.2.1",
+    "terminal-image": "^5.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
@@ -70,7 +75,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

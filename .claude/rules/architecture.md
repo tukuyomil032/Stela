@@ -16,5 +16,5 @@
 
 ## 依存パッケージ
 
-使用するパッケージ: `commander`, `@clack/prompts`, `chalk`, `ora`, `cli-progress`, `gradient-string`, `oh-my-logo`
+使用するパッケージ: `commander`, `@clack/prompts`, `chalk`, `ora`, `cli-progress`, `gradient-string`, `oh-my-logo`, `string-width`, `marked`, `marked-terminal`, `terminal-image`
 
