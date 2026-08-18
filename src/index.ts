@@ -47,7 +47,7 @@ program
   });
 
 program
-  .command('search [query]')
+  .command('search [query...]')
   .description('Search GitHub repositories and star them')
   .option('--no-interactive', 'Output as table only (non-interactive, no starring)')
   .option('--lang <lang>', 'Filter by programming language')

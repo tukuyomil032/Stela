@@ -18,13 +18,15 @@ interface SearchOptions {
 }
 
 export async function searchCommand(
-  query: string | undefined,
+  queryArgs: string[] | undefined,
   options: SearchOptions,
 ): Promise<void> {
   const config = loadConfig();
   const t = createI18n(config.lang);
   const { getToken } = await import('../lib/auth.js');
   const token = getToken();
+
+  let query = queryArgs && queryArgs.length > 0 ? queryArgs.join(' ') : undefined;
 
   if (query === undefined && options.interactive) {
     const result = await searchWizard(t, config.pageSize);

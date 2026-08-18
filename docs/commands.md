@@ -76,12 +76,12 @@ stela star <owner/repo|URL>
 GitHub リポジトリを検索してスターを付ける。
 
 ```
-stela search <query> [options]
+stela search <query...> [options]
 ```
 
 | 引数/オプション | デフォルト | 説明 |
 |--------------|-----------|------|
-| `<query>` | 必須 | 検索クエリ（GitHub search syntax に準拠） |
+| `<query...>` | 必須 | 検索クエリ（GitHub search syntax に準拠）。スペース区切りで複数キーワードを指定可能（例: `stela search react state management`）。クォート無しの複数トークンはスペース結合され、GitHub 側で暗黙的な AND 検索として扱われる |
 | `--lang <language>` | — | 言語フィルタ（クエリに `language:xxx` を付加） |
 | `--sort <field>` | `stars` | ソート順: `stars` \| `forks` \| `updated` |
 | `--limit <n>` | `30` | 結果件数上限（最大 100） |
