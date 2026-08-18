@@ -39,6 +39,7 @@ async function customMultiselect<T extends { full_name: string; description: str
   message: string,
   renderLabel: (item: T, idx: number) => string,
   preSelected?: string[],
+  onViewReadme?: (item: T) => Promise<void>,
 ): Promise<T[]> {
   const selected = new Set<number>(
     preSelected
@@ -50,6 +51,7 @@ async function customMultiselect<T extends { full_name: string; description: str
 
   let cursor = 0;
   let showDesc = false;
+  let busy = false;
   let linesRendered = 0;
   const maxVisible = Math.min(items.length, 15);
   let scrollTop = 0;
@@ -99,7 +101,7 @@ async function customMultiselect<T extends { full_name: string; description: str
     lines.push('');
     lines.push(
       chalk.dim(
-        `  ${selected.size} selected | ↑↓/jk nav, space toggle, i desc, enter confirm, q cancel`,
+        `  ${selected.size} selected | ↑↓/jk nav, space toggle, i desc, r readme, enter confirm, q cancel`,
       ),
     );
     lines.push('');
@@ -183,6 +185,24 @@ async function customMultiselect<T extends { full_name: string; description: str
       } else if (str === 'i') {
         showDesc = true;
         render();
+      } else if (str === 'r' && onViewReadme && process.stdin.isTTY) {
+        if (busy) return;
+        busy = true;
+        // Detach synchronously, before any await: keys pressed while the
+        // README loads must not move the cursor behind the alternate screen
+        process.stdin.removeListener('keypress', onKeypress);
+        const target = items[cursor];
+        void (async () => {
+          try {
+            await onViewReadme(target);
+          } finally {
+            process.stdin.on('keypress', onKeypress);
+            busy = false;
+            // The alternate screen restored what was here, so linesRendered
+            // still describes the list and render() can clear it as usual
+            render();
+          }
+        })();
       } else if (key.name === 'return') {
         clearRendered();
         cleanup();
@@ -233,6 +253,7 @@ export async function confirm(message: string): Promise<boolean> {
 export async function selectMultipleRepos(
   repos: SearchRepo[],
   preSelected?: string[],
+  onViewReadme?: (repo: SearchRepo) => Promise<void>,
 ): Promise<SearchRepo[]> {
   return customMultiselect(
     repos,
@@ -247,6 +268,7 @@ export async function selectMultipleRepos(
       chalk.magenta('⎇') +
       chalk.magenta(String(repo.forks_count)),
     preSelected,
+    onViewReadme,
   );
 }
 
@@ -255,6 +277,7 @@ export type ListAction = 'browser' | 'clipboard' | 'unstar';
 export async function selectMultipleStarredRepos(
   repos: StarredRepo[],
   preSelected?: string[],
+  onViewReadme?: (repo: StarredRepo) => Promise<void>,
 ): Promise<StarredRepo[]> {
   return customMultiselect(
     repos,
@@ -269,6 +292,7 @@ export async function selectMultipleStarredRepos(
       chalk.magenta('⎇') +
       chalk.magenta(String(repo.forks_count)),
     preSelected,
+    onViewReadme,
   );
 }
 
