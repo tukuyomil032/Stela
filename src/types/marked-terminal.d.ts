@@ -8,6 +8,7 @@ declare module 'marked-terminal' {
     unescape?: boolean;
     emoji?: boolean;
     image?: (href: string, title: string | null, text: string) => string;
+    html?: (html: string) => string;
     [key: string]: unknown;
   }
 

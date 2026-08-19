@@ -389,8 +389,11 @@ export async function renderReadme(
   const blockIndices = new Set(images.flatMap((img, i) => (blocks.has(img) ? [i] : [])));
   const withPlaceholders = replaceImagesWithPlaceholders(markdown, images, blockIndices);
 
-  const { Marked } = await import('marked');
-  const { markedTerminal } = await import('marked-terminal');
+  const [{ Marked }, { markedTerminal }, { htmlToTerminalText }] = await Promise.all([
+    import('marked'),
+    import('marked-terminal'),
+    import('./htmlToTerminalText.js'),
+  ]);
 
   const terminalOptions: MarkedTerminalOptions = {
     width,
@@ -399,6 +402,10 @@ export async function renderReadme(
     reflowText: true,
     tab: 2,
     image: (href) => href,
+    // The default just dims raw HTML in place; READMEs that lean on it for
+    // centering/badges (e.g. sindresorhus/awesome) would otherwise render
+    // as a wall of literal tags
+    html: htmlToTerminalText,
   };
 
   const marked = new Marked();
