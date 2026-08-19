@@ -164,13 +164,22 @@ export function placeholderFor(index: number): string {
 const PLACEHOLDER_ANY = /\uE000STELA_IMG_(\d+)\uE000/g;
 
 /**
- * Swap every image for its placeholder, each on its own paragraph.
+ * Swap each image for either a block placeholder or inline fallback text.
  *
- * The surrounding blank lines matter: as a lone paragraph the placeholder is a
- * single token, so marked-terminal's reflow cannot split it in half and leave
- * the second half unreplaceable.
+ * Images listed in `blocks` become a paragraph of their own. The surrounding
+ * blank lines matter: as a lone paragraph the placeholder is a single token, so
+ * marked-terminal's reflow cannot split it in half and leave the second half
+ * unreplaceable.
+ *
+ * Everything else is replaced in place. Badges in particular are usually
+ * wrapped in a link, and lifting one out into its own paragraph would tear the
+ * link apart and leave a bare `](url)` on screen.
  */
-export function replaceImagesWithPlaceholders(markdown: string, images: ExtractedImage[]): string {
+export function replaceImagesWithPlaceholders(
+  markdown: string,
+  images: ExtractedImage[],
+  blocks: ReadonlySet<number> = new Set(images.map((_, i) => i)),
+): string {
   let out = '';
   let pos = 0;
 
@@ -178,7 +187,7 @@ export function replaceImagesWithPlaceholders(markdown: string, images: Extracte
     const at = markdown.indexOf(images[i].raw, pos);
     if (at === -1) continue;
     out += markdown.slice(pos, at);
-    out += `\n\n${placeholderFor(i)}\n\n`;
+    out += blocks.has(i) ? `\n\n${placeholderFor(i)}\n\n` : fallbackFor(images[i]);
     pos = at + images[i].raw.length;
   }
 
@@ -287,7 +296,12 @@ export async function renderReadme(
     if (ansi) blocks.set(img, ansi.replace(/\n+$/, ''));
   });
 
-  const withPlaceholders = replaceImagesWithPlaceholders(markdown, images);
+  // Only images that actually converted get lifted into their own paragraph.
+  // Everything else (skipped, failed fetch, failed decode) stays inline as
+  // fallback text, since most of those are badges wrapped in a link, and
+  // pulling one out would tear the link apart on screen.
+  const blockIndices = new Set(images.flatMap((img, i) => (blocks.has(img) ? [i] : [])));
+  const withPlaceholders = replaceImagesWithPlaceholders(markdown, images, blockIndices);
 
   const { Marked } = await import('marked');
   const { markedTerminal } = await import('marked-terminal');
