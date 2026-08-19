@@ -5,5 +5,5 @@
 - クォート: シングルクォート
 - セミコロン: あり
 - 行長: 100文字
-- 対象: `src/**/*.ts` のみ
+- 対象: `src/**/*.ts`, `tests/**/*.ts`
 - **pre-commit フック**: `lint-staged` が `biome check --write` を自動実行
