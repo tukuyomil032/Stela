@@ -5,6 +5,7 @@ import { loadConfig } from '../lib/config.js';
 import { searchRepos, starRepo } from '../lib/github.js';
 import { createI18n } from '../lib/i18n.js';
 import { searchWizard, selectMultipleRepos, selectPageAction } from '../lib/interactive.js';
+import { createReadmeViewer } from '../lib/readmeViewer.js';
 import type { MultiSortConfig } from '../lib/sort.js';
 import { printSearchTable } from '../lib/table.js';
 import type { SearchRepo } from '../types/github.js';
@@ -25,6 +26,7 @@ export async function searchCommand(
   const t = createI18n(config.lang);
   const { getToken } = await import('../lib/auth.js');
   const token = getToken();
+  const viewReadme = createReadmeViewer(t, async () => token);
 
   let query = queryArgs && queryArgs.length > 0 ? queryArgs.join(' ') : undefined;
 
@@ -120,7 +122,7 @@ export async function searchCommand(
       const preSelected = currentRepos
         .filter((r) => selectedNames.has(r.full_name))
         .map((r) => r.full_name);
-      const pageSelected = await selectMultipleRepos(currentRepos, preSelected);
+      const pageSelected = await selectMultipleRepos(currentRepos, preSelected, viewReadme);
 
       const currentPageNames = new Set(currentRepos.map((r) => r.full_name));
       const pageSelectedNames = new Set(pageSelected.map((r) => r.full_name));

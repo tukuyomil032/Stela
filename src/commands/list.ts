@@ -12,6 +12,7 @@ import {
   selectPageAction,
 } from '../lib/interactive.js';
 import { bytesToBreakdown, formatLanguageBreakdown } from '../lib/languageColors.js';
+import { createReadmeViewer } from '../lib/readmeViewer.js';
 import { copyToClipboard, openInBrowser } from '../lib/system.js';
 import { printTable } from '../lib/table.js';
 import type { StarredRepo } from '../types/github.js';
@@ -26,6 +27,15 @@ interface ListOptions {
 export async function listCommand(options: ListOptions): Promise<void> {
   const config = loadConfig();
   const t = createI18n(config.lang);
+
+  // Resolved on first use: a cache hit means we never fetched a token above
+  let readmeToken: string | null = null;
+  const viewReadme = createReadmeViewer(t, async () => {
+    if (readmeToken) return readmeToken;
+    const { getToken } = await import('../lib/auth.js');
+    readmeToken = getToken();
+    return readmeToken;
+  });
 
   let repos: StarredRepo[];
 
@@ -124,7 +134,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
       const preSelected = currentRepos
         .filter((r) => selectedNames.has(r.full_name))
         .map((r) => r.full_name);
-      const pageSelected = await selectMultipleStarredRepos(currentRepos, preSelected);
+      const pageSelected = await selectMultipleStarredRepos(currentRepos, preSelected, viewReadme);
 
       const currentPageNames = new Set(currentRepos.map((r) => r.full_name));
       const pageSelectedNames = new Set(pageSelected.map((r) => r.full_name));
