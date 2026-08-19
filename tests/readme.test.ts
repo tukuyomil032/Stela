@@ -150,6 +150,20 @@ describe('extractImageUrls', () => {
     );
     expect(images[0].skip).toBe(true);
   });
+
+  it('widens raw to the whole link when an image is wrapped in one', () => {
+    const md = '[![banner](banner.png)](https://example.com/click)';
+    const images = extractImageUrls(md, owner, repo, branch);
+    expect(images).toHaveLength(1);
+    expect(images[0].raw).toBe(md);
+  });
+
+  it('does not widen an image that merely sits next to a link', () => {
+    const md = '![alt](a.png) and [text](https://example.com)';
+    const images = extractImageUrls(md, owner, repo, branch);
+    expect(images).toHaveLength(1);
+    expect(images[0].raw).toBe('![alt](a.png)');
+  });
 });
 
 describe('replaceImagesWithPlaceholders', () => {
@@ -169,11 +183,24 @@ describe('replaceImagesWithPlaceholders', () => {
   });
 
   it('inlines images not listed in the block set instead of isolating them', () => {
-    const md = '[![badge](badge.svg)](https://example.com)';
+    const md = 'before ![badge](badge.svg) after';
     const images = extractImageUrls(md, owner, repo, branch);
     const out = replaceImagesWithPlaceholders(md, images, new Set());
 
     expect(out).not.toContain('STELA_IMG');
-    expect(out).toContain('](https://example.com)');
+    expect(out).toBe('before [image: badge] after');
+  });
+
+  it('replaces the whole wrapping link when an image is its sole content', () => {
+    const md = '[![badge](badge.svg)](https://example.com)';
+    const images = extractImageUrls(md, owner, repo, branch);
+    const out = replaceImagesWithPlaceholders(md, images, new Set());
+
+    // The link cannot be preserved: marked can't parse a link body cut into
+    // a separate paragraph, so the whole [![]()](...)  span is consumed and
+    // replaced as one unit, not just the inner image.
+    expect(out).not.toContain('STELA_IMG');
+    expect(out).not.toContain('](https://example.com)');
+    expect(out).toBe('[image: badge]');
   });
 });

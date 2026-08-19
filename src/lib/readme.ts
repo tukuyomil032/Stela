@@ -122,6 +122,24 @@ function build(
   return { raw, url, alt: alt.trim(), skip: url === null || shouldSkipImage(url) };
 }
 
+const WRAPPING_LINK_TAIL = /^\]\([^\s)]*(?:\s+["'][^"']*["'])?\)/;
+
+/**
+ * Widen an image match to cover `[![alt](src)](href)` when it is the sole
+ * content of a link.
+ *
+ * marked cannot parse a link whose body was cut into a separate paragraph, so
+ * turning just the inner `![]()` into a block placeholder tears the outer
+ * link apart and leaves a bare `](href)` on screen. Consuming the whole span
+ * up front means it gets replaced as one unit instead.
+ */
+function widenForWrappingLink(masked: string, start: number, end: number): [number, number] {
+  if (masked[start - 1] !== '[') return [start, end];
+  const tail = WRAPPING_LINK_TAIL.exec(masked.slice(end));
+  if (!tail) return [start, end];
+  return [start - 1, end + tail[0].length];
+}
+
 export function extractImageUrls(
   markdown: string,
   owner: string,
@@ -132,20 +150,25 @@ export function extractImageUrls(
   const images: ExtractedImage[] = [];
 
   for (const m of masked.matchAll(MD_IMAGE)) {
-    const at = m.index ?? 0;
-    const raw = markdown.slice(at, at + m[0].length);
+    const matchStart = m.index ?? 0;
+    const matchEnd = matchStart + m[0].length;
     const srcOffset = m[0].indexOf(m[2]);
-    const src = markdown.slice(at + srcOffset, at + srcOffset + m[2].length);
-    images.push(build(raw, src, m[1], owner, repo, branch));
+    const src = markdown.slice(matchStart + srcOffset, matchStart + srcOffset + m[2].length);
+
+    const [at, end] = widenForWrappingLink(masked, matchStart, matchEnd);
+    images.push(build(markdown.slice(at, end), src, m[1], owner, repo, branch));
   }
 
   for (const m of masked.matchAll(HTML_IMAGE)) {
-    const at = m.index ?? 0;
-    const raw = markdown.slice(at, at + m[0].length);
-    const src = raw.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
+    const matchStart = m.index ?? 0;
+    const matchEnd = matchStart + m[0].length;
+    const tag = markdown.slice(matchStart, matchEnd);
+    const src = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
     if (!src) continue;
-    const alt = raw.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1] ?? '';
-    images.push(build(raw, src, alt, owner, repo, branch));
+    const alt = tag.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1] ?? '';
+
+    const [at, end] = widenForWrappingLink(masked, matchStart, matchEnd);
+    images.push(build(markdown.slice(at, end), src, alt, owner, repo, branch));
   }
 
   return images;
