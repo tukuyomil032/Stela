@@ -52,12 +52,17 @@ export function createReadmeViewer(
             import('./readme.js'),
             getKittyCapability(),
           ]);
+          // Matches showReadmePager's own bodyHeight calculation, so an image
+          // sized to fit "most of the viewport" actually does and doesn't
+          // just dominate the screen the way an uncapped height would.
+          const bodyHeight = Math.max(3, (process.stdout.rows ?? 24) - 3);
           const rendered = await renderReadme(result.content, {
             owner,
             repo: name,
             defaultBranch: result.defaultBranch,
             token,
             width: Math.max(40, (process.stdout.columns ?? 80) - 2),
+            maxRows: Math.max(5, Math.floor(bodyHeight * 0.4)),
             kitty,
           });
           body = rendered.text;

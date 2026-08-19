@@ -89,14 +89,24 @@ export function fitImageCells(
   imageHeightPx: number,
   maxCols: number,
   cell: { widthPx: number; heightPx: number },
+  maxRows: number = MAX_ROWS,
 ): { cols: number; rows: number } {
-  const cols = Math.max(1, Math.min(maxCols, Math.floor(maxCols)));
-  const displayWidthPx = cols * cell.widthPx;
-  const rows = Math.max(
-    1,
-    Math.min(MAX_ROWS, Math.ceil((imageHeightPx * displayWidthPx) / imageWidthPx / cell.heightPx)),
+  const boundedMaxCols = Math.max(1, Math.floor(maxCols));
+  const boundedMaxRows = Math.max(1, Math.min(MAX_ROWS, Math.floor(maxRows)));
+
+  const rowsFromWidth = Math.ceil(
+    (imageHeightPx * boundedMaxCols * cell.widthPx) / imageWidthPx / cell.heightPx,
   );
-  return { cols, rows };
+  if (rowsFromWidth <= boundedMaxRows) {
+    return { cols: boundedMaxCols, rows: Math.max(1, rowsFromWidth) };
+  }
+
+  // Filling maxCols would need more rows than allowed -- shrink to the row
+  // budget instead and derive cols from that, so aspect ratio still holds.
+  const colsFromHeight = Math.ceil(
+    (imageWidthPx * boundedMaxRows * cell.heightPx) / imageHeightPx / cell.widthPx,
+  );
+  return { cols: Math.max(1, Math.min(boundedMaxCols, colsFromHeight)), rows: boundedMaxRows };
 }
 
 /**

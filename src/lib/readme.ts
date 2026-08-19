@@ -27,6 +27,8 @@ export interface RenderReadmeOptions {
   concurrency?: number;
   /** When supported, PNG images render as real bitmaps instead of ANSI half-blocks. */
   kitty?: KittyCapability;
+  /** Caps image height so one tall image can't fill the whole pager viewport. */
+  maxRows?: number;
 }
 
 export interface RenderedReadme {
@@ -279,7 +281,7 @@ async function mapLimit<T>(
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
-async function toAnsiImage(buf: Buffer, width: number): Promise<string | null> {
+async function toAnsiImage(buf: Buffer, width: number, maxRows?: number): Promise<string | null> {
   try {
     const { default: terminalImage } = await import('terminal-image');
     return await terminalImage.buffer(buf, {
@@ -287,6 +289,10 @@ async function toAnsiImage(buf: Buffer, width: number): Promise<string | null> {
       // ceiling downsampled every image to the point of being unrecognizable
       // on the wide terminals most people actually use.
       width: Math.max(10, width),
+      // With preserveAspectRatio, giving both dimensions scales the image
+      // down to fit whichever is more restrictive -- this is what stops a
+      // tall image from filling the whole pager viewport.
+      height: maxRows,
       preserveAspectRatio: true,
       // Native inline-image protocols emit one escape sequence spanning many
       // rows. The pager slices output line by line, which would cut that
@@ -316,6 +322,7 @@ async function toImageBlock(
   buf: Buffer,
   width: number,
   kitty: KittyCapability | undefined,
+  maxRows: number | undefined,
 ): Promise<ImageBlock | null> {
   if (kitty?.supported) {
     const { pngDimensions, fitImageCells, nextImageId, placeholderGrid, transmitImage } =
@@ -326,10 +333,8 @@ async function toImageBlock(
         dims.width,
         dims.height,
         Math.max(1, Math.round(width)),
-        {
-          widthPx: kitty.cellWidthPx,
-          heightPx: kitty.cellHeightPx,
-        },
+        { widthPx: kitty.cellWidthPx, heightPx: kitty.cellHeightPx },
+        maxRows,
       );
       const id = nextImageId();
       transmitImage(buf, id, cols, rows);
@@ -337,7 +342,7 @@ async function toImageBlock(
     }
   }
 
-  const ansi = await toAnsiImage(buf, width);
+  const ansi = await toAnsiImage(buf, width, maxRows);
   return ansi ? { text: ansi.replace(/\n+$/, '') } : null;
 }
 
@@ -357,7 +362,7 @@ export async function renderReadme(
   markdown: string,
   options: RenderReadmeOptions,
 ): Promise<RenderedReadme> {
-  const { owner, repo, defaultBranch, width, token, kitty } = options;
+  const { owner, repo, defaultBranch, width, token, kitty, maxRows } = options;
   const maxImages = options.maxImages ?? DEFAULT_MAX_IMAGES;
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
 
@@ -371,7 +376,7 @@ export async function renderReadme(
     if (!img.url) return;
     const buf = await fetchImageBuffer(img.url, token);
     if (!buf) return;
-    const block = await toImageBlock(buf, width, kitty);
+    const block = await toImageBlock(buf, width, kitty, maxRows);
     if (!block) return;
     blocks.set(img, block.text);
     if (block.kittyImageId !== undefined) kittyImageIds.push(block.kittyImageId);
