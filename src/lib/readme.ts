@@ -1,4 +1,5 @@
 import type { MarkedTerminalOptions } from 'marked-terminal';
+import type { KittyCapability } from './kittyGraphics.js';
 
 const RAW_BASE = 'https://raw.githubusercontent.com';
 
@@ -24,6 +25,14 @@ export interface RenderReadmeOptions {
   token?: string;
   maxImages?: number;
   concurrency?: number;
+  /** When supported, PNG images render as real bitmaps instead of ANSI half-blocks. */
+  kitty?: KittyCapability;
+}
+
+export interface RenderedReadme {
+  text: string;
+  /** Kitty image ids transmitted during this render, to be deleted once the pager closes. */
+  kittyImageIds: number[];
 }
 
 export interface ExtractedImage {
@@ -289,6 +298,49 @@ async function toAnsiImage(buf: Buffer, width: number): Promise<string | null> {
   }
 }
 
+interface ImageBlock {
+  text: string;
+  /** Set when this block is a Kitty placeholder, so its image can be freed later. */
+  kittyImageId?: number;
+}
+
+/**
+ * Convert one fetched image to display text.
+ *
+ * PNG images render as real bitmaps via Kitty when the terminal supports it;
+ * everything else (non-PNG, or Kitty unsupported/undetectable) falls back to
+ * the ANSI half-block renderer, which accepts any of the formats
+ * SUPPORTED_IMAGE_TYPE lets through.
+ */
+async function toImageBlock(
+  buf: Buffer,
+  width: number,
+  kitty: KittyCapability | undefined,
+): Promise<ImageBlock | null> {
+  if (kitty?.supported) {
+    const { pngDimensions, fitImageCells, nextImageId, placeholderGrid, transmitImage } =
+      await import('./kittyGraphics.js');
+    const dims = pngDimensions(buf);
+    if (dims) {
+      const { cols, rows } = fitImageCells(
+        dims.width,
+        dims.height,
+        Math.max(1, Math.round(width)),
+        {
+          widthPx: kitty.cellWidthPx,
+          heightPx: kitty.cellHeightPx,
+        },
+      );
+      const id = nextImageId();
+      transmitImage(buf, id, cols, rows);
+      return { text: placeholderGrid(cols, rows, id), kittyImageId: id };
+    }
+  }
+
+  const ansi = await toAnsiImage(buf, width);
+  return ansi ? { text: ansi.replace(/\n+$/, '') } : null;
+}
+
 function fallbackFor(image: ExtractedImage): string {
   return image.alt ? `[image: ${image.alt}]` : '[image]';
 }
@@ -304,8 +356,8 @@ function fallbackFor(image: ExtractedImage): string {
 export async function renderReadme(
   markdown: string,
   options: RenderReadmeOptions,
-): Promise<string> {
-  const { owner, repo, defaultBranch, width, token } = options;
+): Promise<RenderedReadme> {
+  const { owner, repo, defaultBranch, width, token, kitty } = options;
   const maxImages = options.maxImages ?? DEFAULT_MAX_IMAGES;
   const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
 
@@ -313,13 +365,16 @@ export async function renderReadme(
 
   const fetchable = images.filter((img) => !img.skip).slice(0, maxImages);
   const blocks = new Map<ExtractedImage, string>();
+  const kittyImageIds: number[] = [];
 
   await mapLimit(fetchable, concurrency, async (img) => {
     if (!img.url) return;
     const buf = await fetchImageBuffer(img.url, token);
     if (!buf) return;
-    const ansi = await toAnsiImage(buf, width);
-    if (ansi) blocks.set(img, ansi.replace(/\n+$/, ''));
+    const block = await toImageBlock(buf, width, kitty);
+    if (!block) return;
+    blocks.set(img, block.text);
+    if (block.kittyImageId !== undefined) kittyImageIds.push(block.kittyImageId);
   });
 
   // Only images that actually converted get lifted into their own paragraph.
@@ -353,5 +408,5 @@ export async function renderReadme(
     return blocks.get(img) ?? fallbackFor(img);
   });
 
-  return restored.replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+  return { text: restored.replace(/\n{3,}/g, '\n\n').replace(/\s+$/, ''), kittyImageIds };
 }

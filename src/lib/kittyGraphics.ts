@@ -132,6 +132,25 @@ export function nextImageId(): number {
   return id;
 }
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * Read width/height straight out of a PNG's IHDR chunk, no decode needed.
+ *
+ * Kitty's `f=100` transmission format is PNG only. Non-PNG buffers (JPEG,
+ * BMP, TIFF — the other formats the ANSI path accepts) return null here, so
+ * the caller falls back to ANSI half-blocks for those instead of pulling in
+ * an image-conversion dependency just to re-encode them.
+ */
+export function pngDimensions(buf: Buffer): { width: number; height: number } | null {
+  if (buf.length < 24 || !buf.subarray(0, 8).equals(PNG_SIGNATURE)) return null;
+  if (buf.readUInt32BE(8) !== 13 || buf.toString('ascii', 12, 16) !== 'IHDR') return null;
+
+  const width = buf.readUInt32BE(16);
+  const height = buf.readUInt32BE(20);
+  return width > 0 && height > 0 ? { width, height } : null;
+}
+
 function chunkBase64(base64: string): string[] {
   const chunks: string[] = [];
   for (let i = 0; i < base64.length; i += CHUNK_SIZE) chunks.push(base64.slice(i, i + CHUNK_SIZE));
