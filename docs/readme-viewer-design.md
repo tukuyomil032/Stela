@@ -147,3 +147,40 @@ export function showReadmePager(rendered: string, title: string, t: Messages): P
 - **ページャーは代替スクリーンバッファを採用**(当初案通り)。`customMultiselect` の `linesRendered` を一切変更せずに済む設計とした。
 - **ローディング表示は `ora` を使わず自前実装**。`ora` はデフォルトでstdinを横取りしてrawModeを操作するため、rawMode所有権の一元管理という設計の中核と衝突すると判断した。
 - **i18n は最小差分**: 新規4キー(+ `readmeDismissHint`)のみ追加し、`interactive.ts` 内の既存の英語ハードコード文字列群の i18n 化はスコープ外とした(別Issue)。
+
+## Phase 2: 画質改善・レンダリング不具合修正
+
+Phase 1マージ前に実端末で動作確認したところ、リスト内リンクが生Markdownのまま表示される不具合、リンクで包まれた画像の周りに `](url)` の残骸が出る不具合、ANSI画像が粗すぎて判別できない問題が見つかり、同じ `feat/readme-viewer` ブランチ上で追加修正した。
+
+### 不具合修正
+
+- **`marked` を `^15` から `^12` にダウングレード。** `marked@13`以降で `marked-terminal@7.3.0` のリスト項目レンダラーが壊れ、リスト内のリンク・太字がインラインMarkdownとして解釈されず生文字列のまま出力される回帰があることを実測で確認した(`marked@{5,7,9,11,12}` は正常、`{13,15}` は不具合再現)。`marked-terminal` の `peerDependencies`(`>=1 <16`)はこの非互換を反映していない。
+- **リンクで包まれた画像(`[![alt](img)](href)`)の一体差し替え。** `extractImageUrls` が画像記法の直前直後に単独の `[` / `](href)` があるかを検出し、あれば外側のリンクごと1つの `raw` として扱うようにした(`widenForWrappingLink`)。従来は画像の内側だけを独立段落プレースホルダーに差し替えていたため、marked が空行区切りのブロックをリンク内に解釈できず `[` と `](href)` が生文字列として残っていた。
+- **ANSI画像の描画幅を本文幅に統一。** `toAnsiImage` にあった `Math.max(10, Math.min(width, 60))` という固定60カラム上限を撤廃し、`renderReadme` に渡された幅(本文と同じ)をそのまま使うようにした。
+
+### Kitty Graphics Protocol(Unicode Placeholder方式)によるネイティブ画像表示
+
+ユーザーから「ANSI半角ブロックでは画像が粗すぎて何かわからない、yaziのようなTUIファイルマネージャー並みの画質にできないか」という要望があり、相談の上でKitty Graphics Protocolを自前実装することにした。
+
+`terminal-image` のKittyパス(`renderKitty()`)は `a=T`(`U=1`なし)で**呼び出した瞬間のカーソル位置に直接描画**し空文字列を返すだけで、「文字列に組み立ててから任意範囲を再スライスする」という本ページャーの設計と根本的に噛み合わない。これがPhase 1でネイティブ描画を既定オフにしていた理由そのもの。
+
+代わりに **Unicode Placeholder方式**(画像をキャッシュに転送しておき、`U+10EEEE` を主体とするプレースホルダー文字列を通常のテキストとして埋め込む方式)を新規モジュール `src/lib/kittyGraphics.ts` に実装した。プレースホルダー文字列は普通のテキストなので、既存の `wrapAnsiLine` によるスクロール・再スライスにそのまま乗る。
+
+- **行の符号化**: 各プレースホルダー行の先頭セルだけに行diacritic(結合文字、[AnswerDotAI/kittytgp](https://github.com/AnswerDotAI/kittytgp) の `rowcolumn_diacritics.txt` 由来、297種)を付け、残りの列は無印のプレースホルダー文字を並べる(列は端末側が自動で埋める)。
+- **画像ID**: truecolor前景色エスケープの下位24bitに埋め込む。
+- **転送**: `a=T,f=100,q=2,U=1,i=<id>,c=<cols>,r=<rows>` + base64ペイロード(4096バイトごとに分割)。
+- **サポート検出**: ダミー画像への `a=q` クエリ + `\x1b[16t`(セル寸法取得) + `\x1b[c`(DA1、全端末が応答)を1回のstdout書き込みで送り、DA1応答が届くまでの読み取りバイト列から判定。タイムアウト時は非サポート扱い。`customMultiselect` が既にキー入力リスナーを外している区間(`r` 押下直後のawait内)で実行するため、通常のキー入力とは競合しない。
+- **tmux越し**: `TMUX` 環境変数があれば全APCシーケンスをpassthroughで包む。
+- **画質の対象を絞った**: PNGのみネイティブ表示(`pngDimensions()` でIHDRチャンクから直接寸法を読み、jimp等の画像デコード依存を増やさない)。非PNG(JPEG/BMP/TIFF)はKitty対応端末でも従来のANSI半角ブロックにフォールバックする。実装コストと「新規の画像デコード依存を増やさない」という制約とのトレードオフとして受け入れた既知の制限。
+- **後始末**: `renderReadme` の戻り値を `{ text, kittyImageIds }` に変更し、`readmeViewer.ts` がページャーを閉じた直後(成功・失敗どちらの経路でも)に `deleteImages()` で転送済み画像を破棄する。連続して複数リポジトリのREADMEを開いても端末側の画像メモリが際限なく増えない。
+- **対象端末**: Kitty / Ghostty / WezTerm / Konsole 等、Kitty Graphics Protocolを実装している端末のみ。iTerm2ネイティブプロトコル・Sixelは対象外(Unicode Placeholder方式を持たないため)で、これらは引き続きANSI半角ブロック表示になる。
+
+### テスト追加
+
+`tests/kittyGraphics.test.ts` に純粋関数のみ追加: `fitImageCells`(アスペクト比維持・上限遵守)、`placeholderGrid`(行数・列数・色エスケープの正しさ、境界値)、`nextImageId`(非ゼロ・24bit範囲)。`pngDimensions` は同ファイル内の実装だがテストは省略(IHDRパースは`readme.ts`同様ネットワーク非依存の単純処理だが、後日追加余地あり)。`detectKittySupport`/`transmitImage`/`deleteImages` は実端末のstdin/stdout依存のため自動テスト対象外。
+
+### 検証状況
+
+- `bun run typecheck && bun run build && bun run biome:check && bun run test` 全てグリーン
+- `renderReadme()` を `kitty.supported: false/true` の両方で直接呼び出し、ANSIフォールバック・Kittyプレースホルダー生成(`a=T,...` APCシーケンスの送出、`U+10EEEE` を含む本文の生成)を確認済み
+- **未検証**: 実際のKitty/Ghostty/WezTerm/Konsole端末上での目視確認、tmux越しのpassthrough動作、`q` で閉じた後の画像メモリ解放。開発環境がこれらの端末を持たないため、次回それらの環境で `r` キーを押して確認する必要がある。
