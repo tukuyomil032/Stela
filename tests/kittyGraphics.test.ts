@@ -60,6 +60,29 @@ describe('fitImageCells', () => {
     expect(cols).toBeGreaterThanOrEqual(1);
     expect(rows).toBeGreaterThanOrEqual(1);
   });
+
+  it('respects maxRows for a tall image that would otherwise exceed it', () => {
+    const unbounded = fitImageCells(900, 1600, 80, CELL);
+    const bounded = fitImageCells(900, 1600, 80, CELL, 10);
+    expect(unbounded.rows).toBeGreaterThan(10);
+    expect(bounded.rows).toBeLessThanOrEqual(10);
+    // shrinking to the row budget should also shrink cols, not just clip rows
+    expect(bounded.cols).toBeLessThan(unbounded.cols);
+  });
+
+  it('does not shrink below maxRows when width-first sizing already fits', () => {
+    const { cols, rows } = fitImageCells(1600, 900, 80, CELL, 25);
+    expect(cols).toBe(80);
+    expect(rows).toBeLessThanOrEqual(25);
+  });
+
+  it('keeps aspect ratio when constrained by maxRows', () => {
+    const { cols, rows } = fitImageCells(1000, 1000, 80, CELL, 5);
+    expect(rows).toBe(5);
+    const displayW = cols * CELL.widthPx;
+    const displayH = rows * CELL.heightPx;
+    expect(displayW / displayH).toBeCloseTo(1, 0);
+  });
 });
 
 describe('placeholderGrid', () => {
