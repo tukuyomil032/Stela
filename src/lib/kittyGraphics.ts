@@ -114,13 +114,18 @@ export function placeholderGrid(cols: number, rows: number, imageId: number): st
   const colorOn = `${ESC}[38;2;${r};${g};${b}m`;
   const colorOff = `${ESC}[39m`;
 
+  // The color escape is repeated on every row, not set once for the whole
+  // grid: the pager clears and redraws only whatever line range is on
+  // screen, and a row whose color escape scrolled off carries no way to
+  // tell the terminal which image its placeholder cells belong to. Kitty
+  // then has nothing to paint and the image vanishes for good.
   const lines: string[] = [];
   for (let row = 0; row < rows; row++) {
     const first = PLACEHOLDER + String.fromCodePoint(ROW_DIACRITICS[row]);
-    lines.push(first + PLACEHOLDER.repeat(cols - 1));
+    lines.push(colorOn + first + PLACEHOLDER.repeat(cols - 1) + colorOff);
   }
 
-  return colorOn + lines.join('\n') + colorOff;
+  return lines.join('\n');
 }
 
 let nextId = 1;
