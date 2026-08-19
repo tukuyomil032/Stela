@@ -274,7 +274,10 @@ async function toAnsiImage(buf: Buffer, width: number): Promise<string | null> {
   try {
     const { default: terminalImage } = await import('terminal-image');
     return await terminalImage.buffer(buf, {
-      width: Math.max(10, Math.min(width, 60)),
+      // Matches the body text width, not an arbitrary cap: a fixed 60-column
+      // ceiling downsampled every image to the point of being unrecognizable
+      // on the wide terminals most people actually use.
+      width: Math.max(10, width),
       preserveAspectRatio: true,
       // Native inline-image protocols emit one escape sequence spanning many
       // rows. The pager slices output line by line, which would cut that
