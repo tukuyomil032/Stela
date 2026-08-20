@@ -3,6 +3,7 @@ import { loadCache, saveCache } from '../lib/cache.js';
 import { exitWithError } from '../lib/error.js';
 import { unstarRepo } from '../lib/github.js';
 import { confirm } from '../lib/interactive.js';
+import { getOctokit } from '../lib/octokit.js';
 
 interface UnstarOptions {
   interactive: boolean;
@@ -28,9 +29,8 @@ export async function unstarCommand(target: string, options: UnstarOptions): Pro
     }
   }
 
-  const { getToken } = await import('../lib/auth.js');
-  const token = getToken();
-  await unstarRepo(token, owner, repo);
+  const octokit = getOctokit();
+  await unstarRepo(octokit, owner, repo);
   console.log(chalk.green(`✓ Unstarred ${target}`));
 
   const cache = loadCache();

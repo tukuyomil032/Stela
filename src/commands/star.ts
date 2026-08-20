@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { clearCache } from '../lib/cache.js';
 import { exitWithError } from '../lib/error.js';
 import { starRepo } from '../lib/github.js';
+import { getOctokit } from '../lib/octokit.js';
 
 interface StarOptions {
   interactive: boolean;
@@ -31,9 +32,8 @@ export async function starCommand(target: string, options: StarOptions): Promise
 
   const { owner, repo } = parseTarget(target);
 
-  const { getToken } = await import('../lib/auth.js');
-  const token = getToken();
-  await starRepo(token, owner, repo);
+  const octokit = getOctokit();
+  await starRepo(octokit, owner, repo);
   console.log(chalk.green(`✓ Starred ${owner}/${repo}`));
 
   clearCache();
