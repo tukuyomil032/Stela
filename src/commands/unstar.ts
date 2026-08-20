@@ -29,7 +29,7 @@ export async function unstarCommand(target: string, options: UnstarOptions): Pro
     }
   }
 
-  const octokit = getOctokit();
+  const octokit = await getOctokit();
   await unstarRepo(octokit, owner, repo);
   console.log(chalk.green(`✓ Unstarred ${target}`));
 

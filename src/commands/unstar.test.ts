@@ -74,7 +74,7 @@ describe('unstarCommand: validation (no network involved)', () => {
 
 describe('unstarCommand: success path (real Octokit client, stubbed global fetch)', () => {
   test('unstars the repo, reports success, and prunes it from the cache', async () => {
-    saveToken('gho_devicetoken');
+    saveToken(JSON.stringify({ token: 'gho_devicetoken' }));
     saveCache([repo({ full_name: 'owner/repo' }), repo({ id: 2, full_name: 'owner/keep' })]);
 
     await withFakeFetch(
@@ -88,7 +88,7 @@ describe('unstarCommand: success path (real Octokit client, stubbed global fetch
   });
 
   test('surfaces a GitHub API failure instead of reporting false success', async () => {
-    saveToken('gho_devicetoken');
+    saveToken(JSON.stringify({ token: 'gho_devicetoken' }));
     await expect(
       withFakeFetch(
         () => new Response(null, { status: 404 }),

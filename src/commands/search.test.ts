@@ -34,7 +34,7 @@ const originalConsoleError = console.error;
 beforeEach(() => {
   resetTmpHome();
   resetFakeKeyring();
-  saveToken('gho_devicetoken');
+  saveToken(JSON.stringify({ token: 'gho_devicetoken' }));
   exitCode = undefined;
   logs = [];
   console.log = (...args: unknown[]) => {

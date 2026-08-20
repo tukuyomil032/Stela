@@ -18,7 +18,7 @@ export async function authStatusCommand(): Promise<void> {
     return;
   }
 
-  const octokit = getOctokit();
+  const octokit = await getOctokit();
   try {
     const { data: user } = await octokit.rest.users.getAuthenticated();
     console.log(chalk.green('✓ Logged in as'), chalk.bold(user.login));

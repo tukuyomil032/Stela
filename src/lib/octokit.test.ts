@@ -19,13 +19,13 @@ afterEach(() => {
 });
 
 describe('getOctokit', () => {
-  test('propagates the not-logged-in failure instead of returning a client with no auth', () => {
-    expect(() => getOctokit()).toThrow('process.exit(1)');
+  test('propagates the not-logged-in failure instead of returning a client with no auth', async () => {
+    await expect(getOctokit()).rejects.toThrow('process.exit(1)');
   });
 
-  test('returns an authenticated Octokit instance backed by the stored token', () => {
-    saveToken('gho_devicetoken');
-    const octokit = getOctokit();
+  test('returns an authenticated Octokit instance backed by the stored token', async () => {
+    saveToken(JSON.stringify({ token: 'gho_devicetoken' }));
+    const octokit = await getOctokit();
     expect(typeof octokit.rest.activity.listReposStarredByAuthenticatedUser).toBe('function');
     expect(typeof octokit.rest.activity.starRepoForAuthenticatedUser).toBe('function');
     expect(typeof octokit.rest.activity.unstarRepoForAuthenticatedUser).toBe('function');

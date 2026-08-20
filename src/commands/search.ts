@@ -24,7 +24,7 @@ export async function searchCommand(
 ): Promise<void> {
   const config = loadConfig();
   const t = createI18n(config.lang);
-  const octokit = getOctokit();
+  const octokit = await getOctokit();
 
   let query = queryArgs && queryArgs.length > 0 ? queryArgs.join(' ') : undefined;
 

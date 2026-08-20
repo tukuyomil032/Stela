@@ -56,7 +56,7 @@ describe('starCommand: validation (no network involved)', () => {
   });
 
   test('accepts a GitHub URL and extracts owner/repo from it', async () => {
-    saveToken('gho_devicetoken');
+    saveToken(JSON.stringify({ token: 'gho_devicetoken' }));
     let requestedPath = '';
     await withFakeFetch(
       (url) => {
@@ -71,7 +71,7 @@ describe('starCommand: validation (no network involved)', () => {
 
 describe('starCommand: success path (real Octokit client, stubbed global fetch)', () => {
   test('stars the repo and reports success', async () => {
-    saveToken('gho_devicetoken');
+    saveToken(JSON.stringify({ token: 'gho_devicetoken' }));
     await withFakeFetch(
       () => new Response(null, { status: 204 }),
       () => starCommand('owner/repo', { interactive: true }),
@@ -80,7 +80,7 @@ describe('starCommand: success path (real Octokit client, stubbed global fetch)'
   });
 
   test('surfaces a GitHub API failure instead of reporting false success', async () => {
-    saveToken('gho_devicetoken');
+    saveToken(JSON.stringify({ token: 'gho_devicetoken' }));
     await expect(
       withFakeFetch(
         () =>

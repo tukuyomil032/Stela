@@ -29,10 +29,10 @@ export async function listCommand(options: ListOptions): Promise<void> {
   const t = createI18n(config.lang);
 
   let repos: StarredRepo[];
-  let octokit: ReturnType<typeof getOctokit> | undefined;
-  function ensureOctokit(): ReturnType<typeof getOctokit> {
+  let octokit: Awaited<ReturnType<typeof getOctokit>> | undefined;
+  async function ensureOctokit(): Promise<Awaited<ReturnType<typeof getOctokit>>> {
     if (!octokit) {
-      octokit = getOctokit();
+      octokit = await getOctokit();
     }
     return octokit;
   }
@@ -43,7 +43,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
   } else {
     const fetchSpinner = ora(t.listFetching).start();
     try {
-      repos = await fetchAllStarred(ensureOctokit(), (fetched) => {
+      repos = await fetchAllStarred(await ensureOctokit(), (fetched) => {
         fetchSpinner.text = `${t.listFetching} ${fetched}`;
       });
       saveCache(repos);
@@ -169,7 +169,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
   for (const repo of allSelected) {
     const [owner, repoName] = repo.full_name.split('/');
-    const bytes = await fetchLanguages(ensureOctokit(), owner, repoName);
+    const bytes = await fetchLanguages(await ensureOctokit(), owner, repoName);
     const breakdown = formatLanguageBreakdown(bytesToBreakdown(bytes));
     if (breakdown) {
       console.log(`  ${chalk.cyan(repo.full_name)} └─ ${breakdown}`);
@@ -202,7 +202,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
       const [owner, repoName] = repo.full_name.split('/');
       const spinner = ora(t.listUnstarring(repo.full_name)).start();
       try {
-        await unstarRepo(ensureOctokit(), owner, repoName);
+        await unstarRepo(await ensureOctokit(), owner, repoName);
         spinner.succeed(`Unstarred ${repo.full_name}`);
         succeeded.push(repo);
       } catch {

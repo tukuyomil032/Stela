@@ -32,7 +32,7 @@ export async function starCommand(target: string, options: StarOptions): Promise
 
   const { owner, repo } = parseTarget(target);
 
-  const octokit = getOctokit();
+  const octokit = await getOctokit();
   await starRepo(octokit, owner, repo);
   console.log(chalk.green(`✓ Starred ${owner}/${repo}`));
 

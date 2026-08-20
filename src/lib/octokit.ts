@@ -7,14 +7,15 @@ export type Octokit = InstanceType<typeof ThrottledOctokit>;
 
 /**
  * Returns an authenticated Octokit client backed by the token stored in the
- * OS keychain (see lib/keyring.ts). Exits with an error if the user has not
- * run `stela auth login`.
+ * OS keychain (see lib/keyring.ts), transparently refreshing it first if
+ * it has expired. Exits with an error if the user has not run
+ * `stela auth login`, or if refreshing an expired session fails.
  *
  * The token is read once here and handed directly to the Octokit
  * constructor; it is not retained in any other variable or cache.
  */
-export function getOctokit(): Octokit {
-  const token = requireToken();
+export async function getOctokit(): Promise<Octokit> {
+  const token = await requireToken();
   return new ThrottledOctokit({
     auth: token,
     throttle: {
