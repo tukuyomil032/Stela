@@ -5,15 +5,14 @@ import { deleteToken, loadToken, saveToken } from './keyring.js';
 import { openInBrowser } from './system.js';
 
 /**
- * GitHub OAuth App client ID (Device Flow enabled, scope: public_repo +
- * offline_access). Per GitHub's official Device Flow docs, the client ID
- * is not a secret and is safe to embed in a distributed client (no
- * client_secret is required for the Device Flow, nor for refreshing a
- * token that the Device Flow issued). Register the app at
- * https://github.com/settings/developers and replace this placeholder
- * before publishing.
+ * GitHub OAuth App client ID (Device Flow + expiring tokens enabled,
+ * scope: public_repo + offline_access). Per GitHub's official Device
+ * Flow docs, the client ID is not a secret and is safe to embed in a
+ * distributed client (no client_secret is required for the Device
+ * Flow, nor for refreshing a token that the Device Flow issued).
+ * Registered at https://github.com/settings/developers.
  */
-const GITHUB_CLIENT_ID = 'REPLACE_WITH_REGISTERED_OAUTH_APP_CLIENT_ID';
+const GITHUB_CLIENT_ID = 'Ov23li5pkRggpqsOe2oi';
 
 /**
  * `offline_access` opts this individual sign-in into an expiring access
