@@ -28,7 +28,7 @@ describe('keyring wrapper', () => {
     expect(loadToken()).toBe('gho_testtoken');
   });
 
-  test('loadToken returns null when nothing is stored (NoEntry)', () => {
+  test('loadToken returns null when nothing is stored (native API returns null, does not throw)', () => {
     expect(loadToken()).toBeNull();
   });
 
@@ -38,24 +38,24 @@ describe('keyring wrapper', () => {
     expect(loadToken()).toBeNull();
   });
 
-  test('deleteToken returns false when nothing is stored (NoEntry), not a silent success', () => {
+  test('deleteToken returns false when nothing is stored (native API returns false, does not throw)', () => {
     expect(deleteToken()).toBe(false);
   });
 
-  test('loadToken exits with an error (does not silently swallow) on non-NoEntry keychain failures', () => {
-    FakeEntry.behavior = 'ambiguous-on-get';
+  test('loadToken exits with an error (does not silently swallow) on unexpected keychain failures', () => {
+    FakeEntry.behavior = 'throw-on-get';
     expect(() => loadToken()).toThrow('process.exit(1)');
     expect(exitCode).toBe(1);
   });
 
   test('saveToken exits with an error on keychain write failures', () => {
-    FakeEntry.behavior = 'ambiguous-on-set';
+    FakeEntry.behavior = 'throw-on-set';
     expect(() => saveToken('gho_testtoken')).toThrow('process.exit(1)');
     expect(exitCode).toBe(1);
   });
 
-  test('deleteToken exits with an error on non-NoEntry keychain failures', () => {
-    FakeEntry.behavior = 'ambiguous-on-delete';
+  test('deleteToken exits with an error on unexpected keychain failures', () => {
+    FakeEntry.behavior = 'throw-on-delete';
     expect(() => deleteToken()).toThrow('process.exit(1)');
     expect(exitCode).toBe(1);
   });

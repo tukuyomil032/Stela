@@ -4,11 +4,15 @@
 // is only ever evaluated once, every test file must register the *same*
 // class instance here rather than defining its own local fake — otherwise
 // state from one test file's fake leaks into another file's assertions.
+//
+// Behavior here matches the real @napi-rs/keyring sync API as verified
+// against the actual macOS Keychain backend: getPassword()/deletePassword()
+// return null/false for a missing entry, they do not throw. Only genuine
+// failures (e.g. an Ambiguous match) throw.
 
 export class FakeEntry {
   static store = new Map<string, string>();
-  static behavior: 'normal' | 'ambiguous-on-set' | 'ambiguous-on-get' | 'ambiguous-on-delete' =
-    'normal';
+  static behavior: 'normal' | 'throw-on-set' | 'throw-on-get' | 'throw-on-delete' = 'normal';
 
   private key: string;
 
@@ -17,31 +21,24 @@ export class FakeEntry {
   }
 
   setPassword(password: string): void {
-    if (FakeEntry.behavior === 'ambiguous-on-set') {
+    if (FakeEntry.behavior === 'throw-on-set') {
       throw new Error('Ambiguous: multiple matching credentials');
     }
     FakeEntry.store.set(this.key, password);
   }
 
   getPassword(): string | null {
-    if (FakeEntry.behavior === 'ambiguous-on-get') {
+    if (FakeEntry.behavior === 'throw-on-get') {
       throw new Error('Ambiguous: multiple matching credentials');
     }
-    const value = FakeEntry.store.get(this.key);
-    if (value === undefined) {
-      throw new Error('NoEntry: no matching entry found in the keychain');
-    }
-    return value;
+    return FakeEntry.store.get(this.key) ?? null;
   }
 
   deletePassword(): boolean {
-    if (FakeEntry.behavior === 'ambiguous-on-delete') {
+    if (FakeEntry.behavior === 'throw-on-delete') {
       throw new Error('Ambiguous: multiple matching credentials');
     }
-    const value = FakeEntry.store.get(this.key);
-    if (value === undefined) {
-      throw new Error('NoEntry: no matching entry found in the keychain');
-    }
+    if (!FakeEntry.store.has(this.key)) return false;
     FakeEntry.store.delete(this.key);
     return true;
   }
