@@ -28,3 +28,6 @@ jobs:
 
       - name: Biome Linter & Formatter Check
         run: bun run biome:check
+
+      - name: Test
+        run: bun test

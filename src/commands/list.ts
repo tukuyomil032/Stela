@@ -12,6 +12,7 @@ import {
   selectPageAction,
 } from '../lib/interactive.js';
 import { bytesToBreakdown, formatLanguageBreakdown } from '../lib/languageColors.js';
+import { getOctokit } from '../lib/octokit.js';
 import { copyToClipboard, openInBrowser } from '../lib/system.js';
 import { printTable } from '../lib/table.js';
 import type { StarredRepo } from '../types/github.js';
@@ -28,16 +29,21 @@ export async function listCommand(options: ListOptions): Promise<void> {
   const t = createI18n(config.lang);
 
   let repos: StarredRepo[];
+  let octokit: Awaited<ReturnType<typeof getOctokit>> | undefined;
+  async function ensureOctokit(): Promise<Awaited<ReturnType<typeof getOctokit>>> {
+    if (!octokit) {
+      octokit = await getOctokit();
+    }
+    return octokit;
+  }
 
   if (!options.refresh && isCacheValid(config.cacheTTL)) {
     const cache = loadCache();
     repos = cache?.repos || [];
   } else {
-    const { getToken } = await import('../lib/auth.js');
-    const token = getToken();
     const fetchSpinner = ora(t.listFetching).start();
     try {
-      repos = await fetchAllStarred(token, (fetched) => {
+      repos = await fetchAllStarred(await ensureOctokit(), (fetched) => {
         fetchSpinner.text = `${t.listFetching} ${fetched}`;
       });
       saveCache(repos);
@@ -161,11 +167,9 @@ export async function listCommand(options: ListOptions): Promise<void> {
     return;
   }
 
-  const { getToken: getTokenForLang } = await import('../lib/auth.js');
-  const tokenForLang = getTokenForLang();
   for (const repo of allSelected) {
     const [owner, repoName] = repo.full_name.split('/');
-    const bytes = await fetchLanguages(tokenForLang, owner, repoName);
+    const bytes = await fetchLanguages(await ensureOctokit(), owner, repoName);
     const breakdown = formatLanguageBreakdown(bytesToBreakdown(bytes));
     if (breakdown) {
       console.log(`  ${chalk.cyan(repo.full_name)} └─ ${breakdown}`);
@@ -193,14 +197,12 @@ export async function listCommand(options: ListOptions): Promise<void> {
       console.log(t.aborted);
       return;
     }
-    const { getToken } = await import('../lib/auth.js');
-    const token = getToken();
     const succeeded: StarredRepo[] = [];
     for (const repo of allSelected) {
       const [owner, repoName] = repo.full_name.split('/');
       const spinner = ora(t.listUnstarring(repo.full_name)).start();
       try {
-        await unstarRepo(token, owner, repoName);
+        await unstarRepo(await ensureOctokit(), owner, repoName);
         spinner.succeed(`Unstarred ${repo.full_name}`);
         succeeded.push(repo);
       } catch {

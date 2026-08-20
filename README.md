@@ -20,12 +20,12 @@ Browse, filter, star, unstar, and search GitHub repositories — all without lea
 - **Caching** — JSON cache with configurable TTL so repeated `list` calls are instant
 - **Language breakdown** — color-coded language stats using GitHub Linguist colors
 - **i18n** — English and Japanese UI (`config set lang ja`)
-- **No token storage** — authentication delegates to the `gh` CLI; no credentials ever written to disk
+- **Secure authentication** — GitHub OAuth Device Flow (`stela auth login`); the token is stored only in your OS keychain, never in a plaintext file
 
 ## Prerequisites
 
 - Node.js 20+
-- [`gh` CLI](https://cli.github.com/) installed and authenticated (`gh auth login`)
+- A GitHub account (no other CLI tools required — `stela auth login` handles authentication)
 
 ## Installation
 
@@ -36,6 +36,9 @@ npm install -g @tukuyomil032/stela
 ## Quick Start
 
 ```bash
+# Log in via GitHub OAuth Device Flow (one-time)
+stela auth login
+
 # Browse your starred repos interactively
 stela list
 
@@ -47,6 +50,16 @@ stela search "awesome cli tools" --lang go
 ```
 
 ## Commands
+
+### `stela auth`
+
+Manage GitHub authentication.
+
+```bash
+stela auth login    # start the OAuth Device Flow
+stela auth status   # show who you're logged in as
+stela auth logout   # remove the stored token from the OS keychain
+```
 
 ### `stela list`
 
@@ -167,16 +180,19 @@ bun run typecheck
 # Lint and format
 bun run biome:fix
 
+# Run tests
+bun test
+
 # Build
 bun run build
 ```
 
 > [!NOTE]
-> The `gh` CLI must be authenticated for development. Run `gh auth login` if you haven't already.
+> Run `bun run dev auth login` once to authenticate locally before exercising commands that hit the GitHub API.
 
 ## How It Works
 
-Stela uses the GitHub REST API via native `fetch` — no Octokit or other GitHub SDK. Authentication is handled dynamically by calling `gh auth token` at runtime, so no credentials are stored on disk. Starred repositories are cached at `~/.stela/cache/starred.json` with a configurable TTL (default 30 minutes).
+Stela authenticates via the GitHub OAuth Device Flow (`@octokit/oauth-methods`, scopes `public_repo` + `offline_access`) and stores the resulting session — access token, refresh token, and expiry — only in your OS keychain (`@napi-rs/keyring` — macOS Keychain, Windows Credential Manager, or Linux Secret Service), never in a plaintext file. When the access token is near expiry, stela transparently refreshes it before running a command; only once the refresh token itself expires do you need to run `stela auth login` again. All GitHub API operations go through an authenticated Octokit client (`@octokit/rest` with `@octokit/plugin-throttling` for automatic rate-limit handling). Starred repositories are cached at `~/.stela/cache/starred.json` with a configurable TTL (default 30 minutes).
 
 ## License
 

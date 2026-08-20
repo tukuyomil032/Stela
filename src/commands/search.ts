@@ -5,6 +5,7 @@ import { loadConfig } from '../lib/config.js';
 import { searchRepos, starRepo } from '../lib/github.js';
 import { createI18n } from '../lib/i18n.js';
 import { searchWizard, selectMultipleRepos, selectPageAction } from '../lib/interactive.js';
+import { getOctokit } from '../lib/octokit.js';
 import type { MultiSortConfig } from '../lib/sort.js';
 import { printSearchTable } from '../lib/table.js';
 import type { SearchRepo } from '../types/github.js';
@@ -23,8 +24,7 @@ export async function searchCommand(
 ): Promise<void> {
   const config = loadConfig();
   const t = createI18n(config.lang);
-  const { getToken } = await import('../lib/auth.js');
-  const token = getToken();
+  const octokit = await getOctokit();
 
   let query = queryArgs && queryArgs.length > 0 ? queryArgs.join(' ') : undefined;
 
@@ -49,7 +49,7 @@ export async function searchCommand(
   let totalCount = 0;
 
   try {
-    const result = await searchRepos(token, query, {
+    const result = await searchRepos(octokit, query, {
       lang: options.lang,
       sort: options.sort,
       limit: options.limit,
@@ -151,7 +151,7 @@ export async function searchCommand(
       } else {
         const pageSpinner = ora(t.searchSearching).start();
         try {
-          const result = await searchRepos(token, query as string, {
+          const result = await searchRepos(octokit, query as string, {
             lang: options.lang,
             sort: options.sort,
             limit: options.limit,
@@ -201,7 +201,7 @@ export async function searchCommand(
     const label = t.searchStarring(repo.full_name, i + 1, allSelected.length);
     const repoSpinner = ora(label).start();
     try {
-      await starRepo(token, owner, repoName);
+      await starRepo(octokit, owner, repoName);
       repoSpinner.succeed(label);
     } catch (e) {
       repoSpinner.fail(`Failed to star ${repo.full_name}`);

@@ -2,6 +2,7 @@
 import { intro } from '@clack/prompts';
 import { Command } from 'commander';
 import { renderFilled } from 'oh-my-logo';
+import { authLoginCommand, authLogoutCommand, authStatusCommand } from './commands/auth.js';
 import { cacheClearCommand, cacheStatusCommand, cacheWizardCommand } from './commands/cache.js';
 import { configSetCommand, configShowCommand, configWizardCommand } from './commands/config.js';
 import { listCommand } from './commands/list.js';
@@ -57,6 +58,31 @@ program
     options.limit = parseInt(options.limit, 10);
     await searchCommand(query, options);
   });
+
+const authCommand = new Command('auth').description('Manage GitHub authentication');
+
+authCommand
+  .command('login')
+  .description('Log in to GitHub via OAuth Device Flow')
+  .action(async () => {
+    await authLoginCommand();
+  });
+
+authCommand
+  .command('logout')
+  .description('Remove the stored GitHub session')
+  .action(() => {
+    authLogoutCommand();
+  });
+
+authCommand
+  .command('status')
+  .description('Show the current authentication status')
+  .action(async () => {
+    await authStatusCommand();
+  });
+
+program.addCommand(authCommand);
 
 const cacheCommand = new Command('cache').description('Manage cache');
 

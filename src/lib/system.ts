@@ -1,7 +1,21 @@
 import { execFileSync } from 'node:child_process';
 import chalk from 'chalk';
 
+function isTrustedGitHubUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && /(^|\.)github\.com$/.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function openInBrowser(url: string): void {
+  if (!isTrustedGitHubUrl(url)) {
+    console.log(chalk.yellow('Refusing to open an untrusted URL: ') + url);
+    return;
+  }
+
   try {
     if (process.platform === 'darwin') {
       execFileSync('open', [url]);
