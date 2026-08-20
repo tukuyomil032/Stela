@@ -1,36 +1,33 @@
-import type { SearchRepo, SearchResult, StarredRepo } from '../types/github.js';
+import type { SearchRepo, StarredRepo } from '../types/github.js';
 import { exitWithError } from './error.js';
-
-const BASE_URL = 'https://api.github.com';
-
-function headers(token: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/vnd.github.v3+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-}
+import type { Octokit } from './octokit.js';
 
 // Session-level in-memory cache for language data
 const languageCache = new Map<string, Record<string, number>>();
 
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function fetchAllStarred(
-  token: string,
+  octokit: Octokit,
   onPage?: (fetched: number, page: number) => void,
 ): Promise<StarredRepo[]> {
   const repos: StarredRepo[] = [];
   let page = 1;
 
   while (true) {
-    const res = await fetch(`${BASE_URL}/user/starred?per_page=100&page=${page}`, {
-      headers: headers(token),
-    });
-
-    if (!res.ok) {
-      exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
+    let data: StarredRepo[];
+    try {
+      const res = await octokit.rest.activity.listReposStarredByAuthenticatedUser({
+        per_page: 100,
+        page,
+      });
+      data = res.data as StarredRepo[];
+    } catch (error) {
+      exitWithError(`GitHub API error: ${toErrorMessage(error)}`);
     }
 
-    const data = (await res.json()) as StarredRepo[];
     if (data.length === 0) break;
 
     repos.push(...data);
@@ -42,30 +39,24 @@ export async function fetchAllStarred(
   return repos;
 }
 
-export async function unstarRepo(token: string, owner: string, repo: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/user/starred/${owner}/${repo}`, {
-    method: 'DELETE',
-    headers: headers(token),
-  });
-
-  if (res.status !== 204) {
-    exitWithError(`Failed to unstar ${owner}/${repo}: ${res.status} ${res.statusText}`);
+export async function unstarRepo(octokit: Octokit, owner: string, repo: string): Promise<void> {
+  try {
+    await octokit.rest.activity.unstarRepoForAuthenticatedUser({ owner, repo });
+  } catch (error) {
+    exitWithError(`Failed to unstar ${owner}/${repo}: ${toErrorMessage(error)}`);
   }
 }
 
-export async function starRepo(token: string, owner: string, repo: string): Promise<void> {
-  const res = await fetch(`${BASE_URL}/user/starred/${owner}/${repo}`, {
-    method: 'PUT',
-    headers: { ...headers(token), 'Content-Length': '0' },
-  });
-
-  if (res.status !== 204) {
-    exitWithError(`Failed to star ${owner}/${repo}: ${res.status} ${res.statusText}`);
+export async function starRepo(octokit: Octokit, owner: string, repo: string): Promise<void> {
+  try {
+    await octokit.rest.activity.starRepoForAuthenticatedUser({ owner, repo });
+  } catch (error) {
+    exitWithError(`Failed to star ${owner}/${repo}: ${toErrorMessage(error)}`);
   }
 }
 
 export async function searchRepos(
-  token: string,
+  octokit: Octokit,
   query: string,
   options: { lang?: string | string[]; sort?: string; limit?: number; page?: number },
 ): Promise<{ items: SearchRepo[]; totalCount: number }> {
@@ -78,28 +69,32 @@ export async function searchRepos(
   const sort = options.sort ?? 'stars';
   const page = options.page ?? 1;
 
-  if (langs.length <= 1) {
+  const sortParam = sort === 'stars' || sort === 'forks' || sort === 'updated' ? sort : undefined;
+
+  async function search(lang: string | undefined) {
     let searchQuery = query;
-    if (langs[0]) searchQuery += ` language:${langs[0]}`;
+    if (lang) searchQuery += ` language:${lang}`;
 
-    const params = new URLSearchParams({
-      q: searchQuery,
-      sort,
-      order: 'desc',
-      per_page: String(perPage),
-      page: String(page),
-    });
-
-    const res = await fetch(`${BASE_URL}/search/repositories?${params}`, {
-      headers: headers(token),
-    });
-
-    if (!res.ok) {
-      exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
+    try {
+      const res = await octokit.rest.search.repos({
+        q: searchQuery,
+        sort: sortParam,
+        order: 'desc',
+        per_page: perPage,
+        page,
+      });
+      return res.data;
+    } catch (error) {
+      exitWithError(`GitHub API error: ${toErrorMessage(error)}`);
     }
+  }
 
-    const data = (await res.json()) as SearchResult;
-    return { items: data.items.slice(0, perPage), totalCount: data.total_count };
+  if (langs.length <= 1) {
+    const data = await search(langs[0]);
+    return {
+      items: (data.items as SearchRepo[]).slice(0, perPage),
+      totalCount: data.total_count,
+    };
   }
 
   const seen = new Set<number>();
@@ -107,29 +102,10 @@ export async function searchRepos(
   let maxTotalCount = 0;
 
   for (const lang of langs) {
-    let searchQuery = query;
-    if (lang) searchQuery += ` language:${lang}`;
-
-    const params = new URLSearchParams({
-      q: searchQuery,
-      sort,
-      order: 'desc',
-      per_page: String(perPage),
-      page: String(page),
-    });
-
-    const res = await fetch(`${BASE_URL}/search/repositories?${params}`, {
-      headers: headers(token),
-    });
-
-    if (!res.ok) {
-      exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
-    }
-
-    const data = (await res.json()) as SearchResult;
+    const data = await search(lang);
     maxTotalCount = Math.max(maxTotalCount, data.total_count);
 
-    for (const item of data.items) {
+    for (const item of data.items as SearchRepo[]) {
       if (!seen.has(item.id)) {
         seen.add(item.id);
         merged.push(item);
@@ -150,7 +126,7 @@ export async function searchRepos(
 }
 
 export async function fetchLanguages(
-  token: string,
+  octokit: Octokit,
   owner: string,
   repo: string,
 ): Promise<Record<string, number>> {
@@ -158,20 +134,15 @@ export async function fetchLanguages(
   const cached = languageCache.get(key);
   if (cached) return cached;
 
-  const res = await fetch(`${BASE_URL}/repos/${owner}/${repo}/languages`, {
-    headers: headers(token),
-  });
-
-  if (res.status === 404) {
-    languageCache.set(key, {});
-    return {};
+  try {
+    const res = await octokit.rest.repos.listLanguages({ owner, repo });
+    languageCache.set(key, res.data);
+    return res.data;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'status' in error && error.status === 404) {
+      languageCache.set(key, {});
+      return {};
+    }
+    exitWithError(`GitHub API error: ${toErrorMessage(error)}`);
   }
-
-  if (!res.ok) {
-    exitWithError(`GitHub API error: ${res.status} ${res.statusText}`);
-  }
-
-  const data = (await res.json()) as Record<string, number>;
-  languageCache.set(key, data);
-  return data;
 }
