@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { FakeEntry, resetFakeKeyring } from './testing/fakeKeyring.js';
+import { resetFakeKeyring } from './testing/fakeKeyring.js';
 
 let authImpl: (options: { type: 'oauth' }) => Promise<{ token: string }>;
 let lastOnVerification: ((v: unknown) => void) | undefined;
 let openedUrls: string[] = [];
-
-mock.module('@napi-rs/keyring', () => ({ Entry: FakeEntry }));
 
 mock.module('./system.js', () => ({
   openInBrowser: (url: string) => {

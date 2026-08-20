@@ -1,3 +1,5 @@
+import { mock } from 'bun:test';
+
 // Shared fake for `@napi-rs/keyring`'s `Entry` class, used across multiple
 // test files. `bun:test`'s `mock.module()` replaces a module specifier
 // globally for the whole test process (not per-file), and since keyring.ts
@@ -48,3 +50,5 @@ export function resetFakeKeyring(): void {
   FakeEntry.store.clear();
   FakeEntry.behavior = 'normal';
 }
+
+mock.module('@napi-rs/keyring', () => ({ Entry: FakeEntry }));

@@ -1,7 +1,5 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { FakeEntry, resetFakeKeyring } from './testing/fakeKeyring.js';
-
-mock.module('@napi-rs/keyring', () => ({ Entry: FakeEntry }));
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { resetFakeKeyring } from './testing/fakeKeyring.js';
 
 const { getOctokit } = await import('./octokit.js');
 const { saveToken } = await import('./keyring.js');
