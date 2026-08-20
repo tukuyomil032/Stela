@@ -11,8 +11,9 @@
 
 ### 2.1 認証
 
-- GitHub OAuth Device Flow（`stela auth login`）でログインする。スコープは `public_repo` のみ
-- 取得したアクセストークンは OS キーチェーン（macOS Keychain / Windows Credential Manager / Linux Secret Service）にのみ保存する。`~/.stela/` 配下のファイルや平文には一切保存しない
+- GitHub OAuth Device Flow（`stela auth login`）でログインする。スコープは `public_repo` + `offline_access`（有効期限付きトークン + リフレッシュトークンを発行させるランタイムオプトイン）
+- アクセストークンの有効期限が近づいた場合、コマンド実行時に自動でリフレッシュトークンを使って更新する（`stela auth login` のやり直しは不要）。リフレッシュトークン自体が失効した場合のみ再ログインが必要
+- 取得したアクセストークン・リフレッシュトークン・有効期限は OS キーチェーン（macOS Keychain / Windows Credential Manager / Linux Secret Service）にのみ保存する。`~/.stela/` 配下のファイルや平文には一切保存しない
 - `stela auth logout` でキーチェーンからトークンを削除できる
 - `stela auth status` でログイン状態と有効性（GitHub API への疎通）を確認できる
 - 未ログイン状態で star/unstar/list/search 等を実行した場合はエラーメッセージを stderr に出力して終了する（`stela auth login` を案内）

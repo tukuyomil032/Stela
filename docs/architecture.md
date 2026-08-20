@@ -57,27 +57,36 @@ src/
 
 ## 4. 認証フロー
 
-GitHub 公式の [OAuth Device Flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) を使用する（スコープ: `public_repo`）。
+GitHub 公式の [OAuth Device Flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) を使用する（スコープ: `public_repo` + `offline_access`）。`offline_access` は個々のサインインを有効期限付きトークン化するランタイムオプトインで、OAuth App 側の追加設定なしに有効期限付きアクセストークン + リフレッシュトークンが発行される。
+
+`@octokit/auth-oauth-device` の便利ラッパーは OAuth App（`clientType: 'oauth-app'`）向けのリフレッシュトークン処理を実装していない（GitHub Apps 向けのコードパスでしか `refresh_token`/`expires_in` を読み取らない）ため、低レベル API の `@octokit/oauth-methods`（`createDeviceCode`/`exchangeDeviceCode`）を直接呼び出し、ポーリングループ（`authorization_pending` は継続、`slow_down` は間隔 +5 秒、`expired_token`/`access_denied` は終了）を自前実装している。
 
 ```
 stela auth login
-  └─ lib/auth.ts: createOAuthDeviceAuth({ clientType: 'oauth-app', clientId, scopes: ['public_repo'], onVerification })
-       ├─ onVerification: verification_uri / user_code をユーザーに提示し、ブラウザを自動起動
-       ├─ ポーリング（authorization_pending / slow_down は @octokit/auth-oauth-device が内部で自動リトライ）
-       ├─ 成功: 取得したアクセストークンを lib/keyring.ts 経由で OS キーチェーンに保存
-       └─ 失敗（expired_token 等）: error.ts 経由でユーザーフレンドリーなメッセージを出力して終了
+  └─ lib/auth.ts
+       ├─ createDeviceCode({ clientType: 'oauth-app', clientId, scopes: ['public_repo', 'offline_access'] })
+       ├─ verification_uri / user_code をユーザーに提示し、ブラウザを自動起動
+       ├─ exchangeDeviceCode() をポーリング（authorization_pending / slow_down は自前で継続、expired_token 等は終了）
+       ├─ 成功: { token, refreshToken?, expiresAt?, refreshTokenExpiresAt? } を JSON化して
+       │        lib/keyring.ts 経由で OS キーチェーンに保存
+       └─ 失敗: error.ts 経由でユーザーフレンドリーなメッセージを出力して終了
 
 stela の各コマンド実行時
-  └─ lib/octokit.ts: getOctokit()
-       ├─ lib/keyring.ts 経由で OS キーチェーンからトークンを読み込み
-       ├─ 未ログイン: 「stela auth login を実行してください」と案内して終了
-       └─ ログイン済み: トークンで初期化した Octokit クライアントを返す
+  └─ lib/octokit.ts: getOctokit()（非同期）
+       └─ lib/auth.ts: requireToken()
+            ├─ 未ログイン: 「stela auth login を実行してください」と案内して終了
+            ├─ 有効期限なし、または期限内: 保存済みトークンをそのまま返す
+            ├─ 期限切れ間近/超過 かつ リフレッシュトークンも失効: 終了（再ログインを案内）
+            └─ 期限切れ間近/超過: GitHub の `POST https://github.com/login/oauth/access_token`
+                （`grant_type=refresh_token`）に対し fetch で直接リクエスト（Device Flow で
+                発行されたリフレッシュトークンは client_secret 不要。REST API 操作ではないため
+                lib/octokit.ts を経由しない）。新しいトークンをキーチェーンに保存し直す
 
 stela auth logout
-  └─ lib/keyring.ts 経由で OS キーチェーンからトークンを削除
+  └─ lib/keyring.ts 経由で OS キーチェーンからセッションを削除
 ```
 
-トークンは `~/.stela/` 配下のファイルには一切保存しない。OS キーチェーン（macOS Keychain / Windows Credential Manager / Linux Secret Service）にのみ保存する。
+トークン（および付随するリフレッシュトークン・有効期限）は `~/.stela/` 配下のファイルには一切保存しない。OS キーチェーン（macOS Keychain / Windows Credential Manager / Linux Secret Service）に JSON 化して一つのエントリとして保存する。
 
 ## 5. インタラクティブ UI フロー（list コマンドの例）
 

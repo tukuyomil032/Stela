@@ -192,7 +192,7 @@ bun run build
 
 ## How It Works
 
-Stela authenticates via the GitHub OAuth Device Flow (`@octokit/auth-oauth-device`) and stores the resulting access token only in your OS keychain (`@napi-rs/keyring` — macOS Keychain, Windows Credential Manager, or Linux Secret Service), never in a plaintext file. All GitHub API operations go through an authenticated Octokit client (`@octokit/rest` with `@octokit/plugin-throttling` for automatic rate-limit handling). Starred repositories are cached at `~/.stela/cache/starred.json` with a configurable TTL (default 30 minutes).
+Stela authenticates via the GitHub OAuth Device Flow (`@octokit/oauth-methods`, scopes `public_repo` + `offline_access`) and stores the resulting session — access token, refresh token, and expiry — only in your OS keychain (`@napi-rs/keyring` — macOS Keychain, Windows Credential Manager, or Linux Secret Service), never in a plaintext file. When the access token is near expiry, stela transparently refreshes it before running a command; only once the refresh token itself expires do you need to run `stela auth login` again. All GitHub API operations go through an authenticated Octokit client (`@octokit/rest` with `@octokit/plugin-throttling` for automatic rate-limit handling). Starred repositories are cached at `~/.stela/cache/starred.json` with a configurable TTL (default 30 minutes).
 
 ## License
 

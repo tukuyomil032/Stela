@@ -18,5 +18,5 @@
 
 ## 依存パッケージ
 
-使用するパッケージ: `commander`, `@clack/prompts`, `chalk`, `ora`, `cli-progress`, `gradient-string`, `oh-my-logo`, `@octokit/rest`, `@octokit/auth-oauth-device`, `@octokit/plugin-throttling`, `@napi-rs/keyring`
+使用するパッケージ: `commander`, `@clack/prompts`, `chalk`, `ora`, `cli-progress`, `gradient-string`, `oh-my-logo`, `@octokit/rest`, `@octokit/oauth-methods`, `@octokit/plugin-throttling`, `@napi-rs/keyring`
 
