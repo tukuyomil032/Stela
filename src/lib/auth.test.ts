@@ -332,4 +332,23 @@ describe('auth: requireToken', () => {
     ).rejects.toThrow('process.exit(1)');
     expect(exitMessage).toContain('bad_refresh_token');
   });
+
+  test('surfaces an unreadable (non-JSON) refresh response instead of crashing with an unhandled rejection', async () => {
+    saveToken(
+      expiringSession({
+        token: 'gho_old',
+        refreshToken: 'ghr_old',
+        expiresAt: new Date(Date.now() - 1000).toISOString(),
+        refreshTokenExpiresAt: new Date(Date.now() + 1_000_000_000).toISOString(),
+      }),
+    );
+
+    await expect(
+      withFakeFetch(
+        () => new Response('<html>502 Bad Gateway</html>', { status: 502 }),
+        () => requireToken(),
+      ),
+    ).rejects.toThrow('process.exit(1)');
+    expect(exitMessage).toContain('unreadable response');
+  });
 });

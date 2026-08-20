@@ -205,13 +205,20 @@ async function refreshAccessToken(stored: StoredAuth): Promise<StoredAuth> {
     );
   }
 
-  const data = (await response.json()) as {
+  let data: {
     error?: string;
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;
     refresh_token_expires_in?: number;
   };
+  try {
+    data = await response.json();
+  } catch (error) {
+    exitWithError(
+      `GitHub returned an unreadable response while refreshing the session: ${toErrorMessage(error)}. Run: stela auth login`,
+    );
+  }
 
   if (
     !response.ok ||
