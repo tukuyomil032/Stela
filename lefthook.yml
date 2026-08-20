@@ -1,0 +1,7 @@
+pre-commit:
+  parallel: true
+  commands:
+    check:
+      run: bun biome:check
+    test:
+      run: bun test
