@@ -2,7 +2,7 @@
 
 ## Phase1 — MVP
 
-- [x] gh auth token 経由の認証
+- [x] OAuth Device Flow によるログイン/ログアウト/ステータス確認（`auth` コマンド）と OS キーチェーンへのトークン保存、Octokit（`@octokit/rest` + `plugin-throttling`）経由での GitHub API 操作への移行
 - [x] `list` コマンド（インタラクティブ + `--no-interactive`）
 - [x] `unstar` コマンド
 - [x] `star` コマンド

@@ -13,8 +13,10 @@ src/
     cache.ts
     config.ts
   lib/
-    auth.ts             — gh auth token 経由のトークン取得
-    github.ts           — GitHub REST API クライアント（fetch ベース）
+    auth.ts             — OAuth Device Flow によるログイン/ログアウト
+    keyring.ts          — OS キーチェーンへのトークン保存/読込/削除
+    octokit.ts          — 認証済み Octokit クライアント生成（throttling プラグイン込み）
+    github.ts           — GitHub API 操作（Octokit クライアント経由）
     cache.ts            — キャッシュ読み書きロジック
     config.ts           — 設定ファイル読み書き
     interactive.ts      — @clack/prompts UI ロジック（fuzzy リスト）
@@ -27,16 +29,16 @@ src/
 
 ## 2. GitHub API 連携方針
 
-- **Octokit は使用しない**。Node.js 標準の `fetch` で GitHub REST API を直叩きする
-  - 理由: バンドルサイズ削減。`gh auth token` で取得したトークンを `Authorization` ヘッダーに渡すだけで認証が完結するため Octokit の追加機能は不要
-- **ベース URL**: `https://api.github.com`
-- **使用エンドポイント**:
-  - `GET /user/starred` — スター一覧取得（ページネーション対応）
-  - `DELETE /user/starred/{owner}/{repo}` — スター解除
-  - `PUT /user/starred/{owner}/{repo}` — スター付与
-  - `GET /search/repositories` — リポジトリ検索
-- **ページネーション**: `Link` ヘッダーを解析して全件取得。`cli-progress` でプログレスバー表示
-- **レート制限**: `X-RateLimit-Remaining` ヘッダーを監視し、枯渇時はユーザーに警告する
+- **Octokit（`@octokit/rest`）を使用する**。`src/lib/octokit.ts` の `getOctokit()` が、OS キーチェーンに保存されたトークンで初期化済みの Octokit クライアントを返す
+- **レート制限対策**: `@octokit/plugin-throttling` を組み込み、`onRateLimit` / `onSecondaryRateLimit` で自動リトライ・警告ログを行う
+- **使用 API（`octokit.rest.*`）**:
+  - `activity.listReposStarredByAuthenticatedUser` — スター一覧取得（ページネーション対応）
+  - `activity.unstarRepoForAuthenticatedUser` — スター解除
+  - `activity.starRepoForAuthenticatedUser` — スター付与
+  - `search.repos` — リポジトリ検索
+  - `repos.listLanguages` — 言語内訳取得
+  - `users.getAuthenticated` — `auth status` での疎通確認
+- **ページネーション**: `page`/`per_page` パラメータで全件取得
 
 ## 3. キャッシュ仕様
 
@@ -55,12 +57,27 @@ src/
 
 ## 4. 認証フロー
 
+GitHub 公式の [OAuth Device Flow](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#device-flow) を使用する（スコープ: `public_repo`）。
+
 ```
-lib/auth.ts
-  └─ execa('gh', ['auth', 'token'])
-       ├─ 成功: トークン文字列を返す
-       └─ 失敗: error.ts 経由でユーザーフレンドリーなメッセージを出力して終了
+stela auth login
+  └─ lib/auth.ts: createOAuthDeviceAuth({ clientType: 'oauth-app', clientId, scopes: ['public_repo'], onVerification })
+       ├─ onVerification: verification_uri / user_code をユーザーに提示し、ブラウザを自動起動
+       ├─ ポーリング（authorization_pending / slow_down は @octokit/auth-oauth-device が内部で自動リトライ）
+       ├─ 成功: 取得したアクセストークンを lib/keyring.ts 経由で OS キーチェーンに保存
+       └─ 失敗（expired_token 等）: error.ts 経由でユーザーフレンドリーなメッセージを出力して終了
+
+stela の各コマンド実行時
+  └─ lib/octokit.ts: getOctokit()
+       ├─ lib/keyring.ts 経由で OS キーチェーンからトークンを読み込み
+       ├─ 未ログイン: 「stela auth login を実行してください」と案内して終了
+       └─ ログイン済み: トークンで初期化した Octokit クライアントを返す
+
+stela auth logout
+  └─ lib/keyring.ts 経由で OS キーチェーンからトークンを削除
 ```
+
+トークンは `~/.stela/` 配下のファイルには一切保存しない。OS キーチェーン（macOS Keychain / Windows Credential Manager / Linux Secret Service）にのみ保存する。
 
 ## 5. インタラクティブ UI フロー（list コマンドの例）
 

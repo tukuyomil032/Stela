@@ -5,19 +5,23 @@
 - **ツール名**: stela
 - **npm パッケージ**: `@tukuyomil032/stela`
 - **用途**: GitHub のスター済みリポジトリを管理する CLI ツール
-- **実行前提**: `gh` CLI がインストール済みで `gh auth login` 済みであること
+- **実行前提**: なし（初回実行時に `stela auth login` で GitHub OAuth Device Flow によるログインを行う）
 
 ## 2. Functional Requirements
 
 ### 2.1 認証
 
-- `gh auth token` コマンド経由でトークンを取得する（永続保存しない）
-- `gh` 未インストール・未認証の場合はエラーメッセージを stderr に出力して終了する
+- GitHub OAuth Device Flow（`stela auth login`）でログインする。スコープは `public_repo` のみ
+- 取得したアクセストークンは OS キーチェーン（macOS Keychain / Windows Credential Manager / Linux Secret Service）にのみ保存する。`~/.stela/` 配下のファイルや平文には一切保存しない
+- `stela auth logout` でキーチェーンからトークンを削除できる
+- `stela auth status` でログイン状態と有効性（GitHub API への疎通）を確認できる
+- 未ログイン状態で star/unstar/list/search 等を実行した場合はエラーメッセージを stderr に出力して終了する（`stela auth login` を案内）
 
 ### 2.2 コマンド一覧
 
 | コマンド | 概要 |
 |---------|------|
+| `auth`  | GitHub 認証の管理（login/logout/status） |
 | `list`  | スター済みリポジトリ一覧を表示 |
 | `unstar` | リポジトリのスターを外す |
 | `star`  | リポジトリにスターを付ける |
