@@ -14,7 +14,7 @@ const program = new Command();
 
 program
   .name('stela')
-  .version('0.0.3')
+  .version('0.0.4')
   .description(
     'A TypeScript CLI that lets you view starred repositories, unstar them, and search for repositories by language or genre to star new ones',
   );

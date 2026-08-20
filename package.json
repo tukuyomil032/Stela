@@ -1,7 +1,7 @@
 {
   "name": "@tukuyomil032/stela",
   "private": false,
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A TypeScript-based CLI that lets you view a list of repositories you've starred, unstar them, and search for repositories using a wide range of criteria—such as language, genre, and keyword matches—to find new ones to star.",
   "type": "module",
   "main": "./dist/index.js",
@@ -43,10 +43,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tukuyomil032/stela.git"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   },
   "bugs": {
     "url": "https://github.com/tukuyomil032/stela/issues"
