@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import stringWidth from 'string-width';
 import {
   createFetchProgressRenderer,
+  FETCH_PALETTE,
   renderFetchFrame,
   renderFetchProgress,
   renderShimmer,
@@ -97,6 +98,27 @@ describe('renderFetchProgress', () => {
 });
 
 describe('renderShimmer', () => {
+  test('uses the pale mint and teal palette for message and progress output', () => {
+    expect(FETCH_PALETTE).toEqual({
+      messageBase: '#5EEAD4',
+      highlightEnd: '#99F6E4',
+      highlightStart: '#ECFDF5',
+    });
+
+    const originalLevel = chalk.level;
+    chalk.level = 1;
+    try {
+      const message = renderShimmer('Fetching repositories', 0, true);
+      const progress = renderFetchProgress({ fetched: 5, total: 10 }, 10, true);
+      expect(message).toContain('\u001b[');
+      expect(progress).toContain('\u001b[');
+      expect(message).not.toContain('\u001b[94m');
+      expect(progress).not.toContain('\u001b[94m');
+    } finally {
+      chalk.level = originalLevel;
+    }
+  });
+
   test('moves the highlight window from left to right', () => {
     const originalLevel = chalk.level;
     chalk.level = 1;

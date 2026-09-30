@@ -24,6 +24,12 @@ type FetchProgressStream = NodeJS.WritableStream & {
 const SHIMMER_WIDTH = 4;
 const FETCH_PROGRESS_WIDTH = 24;
 
+export const FETCH_PALETTE = {
+  messageBase: '#5EEAD4',
+  highlightEnd: '#99F6E4',
+  highlightStart: '#ECFDF5',
+} as const;
+
 /** Color a moving window while preserving the input's visible width. */
 export function renderShimmer(text: string, frame: number, color = true): string {
   if (!color || text.length === 0) return text;
@@ -36,9 +42,9 @@ export function renderShimmer(text: string, frame: number, color = true): string
   const after = characters.slice(end).join('');
 
   return (
-    gradient('blue', 'blue')(before) +
-    gradient('cyan', 'blue')(highlight) +
-    gradient('blue', 'blue')(after)
+    gradient(FETCH_PALETTE.messageBase, FETCH_PALETTE.messageBase)(before) +
+    gradient(FETCH_PALETTE.highlightStart, FETCH_PALETTE.highlightEnd)(highlight) +
+    gradient(FETCH_PALETTE.messageBase, FETCH_PALETTE.messageBase)(after)
   );
 }
 
@@ -161,7 +167,7 @@ export function renderFetchProgress(state: ProgressState, width = 24, color = tr
   const active = '='.repeat(Math.max(0, filled - 1)) + (filled > 0 ? '>' : '');
   const remaining = '-'.repeat(safeWidth - filled);
   const bar = color
-    ? `[${chalk.bold(gradient('cyan', 'blue')(active))}${chalk.dim(remaining)}]`
+    ? `[${chalk.bold(gradient(FETCH_PALETTE.highlightStart, FETCH_PALETTE.messageBase)(active))}${chalk.dim(remaining)}]`
     : `[${active}${remaining}]`;
   return `${color ? chalk.bold(bar) : bar} ${state.fetched}/${state.total ?? '?'}`;
 }
