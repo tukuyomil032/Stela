@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { isCacheValid, loadCache, saveCache } from '../lib/cache.js';
 import { loadConfig } from '../lib/config.js';
+import { filterStarredRepos } from '../lib/filter.js';
 import { fetchAllStarred, fetchLanguages, unstarRepo } from '../lib/github.js';
 import { createI18n } from '../lib/i18n.js';
 import {
@@ -13,11 +14,13 @@ import {
 } from '../lib/interactive.js';
 import { bytesToBreakdown, formatLanguageBreakdown } from '../lib/languageColors.js';
 import { getOctokit } from '../lib/octokit.js';
+import { createFetchProgressRenderer } from '../lib/progress.js';
 import { copyToClipboard, openInBrowser } from '../lib/system.js';
 import { printTable } from '../lib/table.js';
 import type { StarredRepo } from '../types/github.js';
 
 interface ListOptions {
+  keywords?: string[];
   interactive: boolean;
   lang?: string | string[];
   sort?: string;
@@ -41,21 +44,62 @@ export async function listCommand(options: ListOptions): Promise<void> {
     const cache = loadCache();
     repos = cache?.repos || [];
   } else {
-    const fetchSpinner = ora(t.listFetching).start();
+    const fetchProgress = createFetchProgressRenderer(
+      t.listFetching,
+      chalk.level > 0,
+      process.stderr,
+    );
     try {
-      repos = await fetchAllStarred(await ensureOctokit(), (fetched) => {
-        fetchSpinner.text = `${t.listFetching} ${fetched}`;
+      repos = await fetchAllStarred(await ensureOctokit(), (fetched, _page, total) => {
+        fetchProgress.update({ fetched, total });
       });
       saveCache(repos);
-      fetchSpinner.succeed(chalk.green(t.listFetched(repos.length)));
+      fetchProgress.succeed(chalk.green(t.listFetched(repos.length)));
     } catch (e) {
-      fetchSpinner.fail();
+      fetchProgress.fail();
       throw e;
     }
   }
 
-  if (!options.lang && !options.sort && options.interactive) {
-    const wizardResult = await listWizard(t, repos);
+  const allRepos = repos;
+  let keywordQuery = options.keywords?.join(' ').trim() ?? '';
+  let liveInitialQuery = '';
+
+  if (!options.keywords && !options.lang && !options.sort && options.interactive) {
+    const wizardResult = await listWizard(
+      t,
+      repos,
+      '',
+      undefined,
+      undefined,
+      config.searchUpdateMode === 'live'
+        ? {
+            mode: 'live' as const,
+            onQueryChange: (nextQuery: string) => filterStarredRepos(allRepos, nextQuery),
+            onQueryResult: (value: unknown, nextQuery: string) => {
+              liveInitialQuery = nextQuery;
+              if (process.stdout.isTTY) {
+                process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                printTable(value as StarredRepo[], t);
+              }
+            },
+            onConditionsChange: ({ lang }: { lang?: string[] }) => {
+              options.lang = lang;
+              let filtered = filterStarredRepos(allRepos, liveInitialQuery);
+              if (lang && lang.length > 0) {
+                const selected = lang.map((value) => value.toLowerCase());
+                filtered = filtered.filter(
+                  (repo) => repo.language && selected.includes(repo.language.toLowerCase()),
+                );
+              }
+              if (process.stdout.isTTY) {
+                process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                printTable(filtered, t);
+              }
+            },
+          }
+        : undefined,
+    );
     if (wizardResult === null) {
       console.log(t.aborted);
       return;
@@ -63,29 +107,79 @@ export async function listCommand(options: ListOptions): Promise<void> {
     if (wizardResult.lang) {
       options.lang = wizardResult.lang;
     }
-    if (wizardResult.sort) {
-      options.sort = wizardResult.sort;
+    options.sort = wizardResult.sort || undefined;
+    keywordQuery = wizardResult.query ?? '';
+  }
+
+  const applyListFilters = (): void => {
+    repos = filterStarredRepos(allRepos, keywordQuery);
+    if (options.lang) {
+      const langs = Array.isArray(options.lang)
+        ? options.lang.map((l) => l.toLowerCase())
+        : [options.lang.toLowerCase()];
+      repos = repos.filter((r) => r.language && langs.includes(r.language.toLowerCase()));
     }
-  }
-
-  if (options.lang) {
-    const langs = Array.isArray(options.lang)
-      ? options.lang.map((l) => l.toLowerCase())
-      : [options.lang.toLowerCase()];
-    repos = repos.filter((r) => r.language && langs.includes(r.language.toLowerCase()));
-  }
-
-  if (options.sort === 'stars') {
-    repos = repos.sort((a, b) => b.stargazers_count - a.stargazers_count);
-  } else if (options.sort === 'updated') {
-    repos = repos.sort(
-      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-    );
-  }
+    if (options.sort === 'stars') {
+      repos = repos.sort((a, b) => b.stargazers_count - a.stargazers_count);
+    } else if (options.sort === 'updated') {
+      repos = repos.sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      );
+    }
+  };
+  applyListFilters();
 
   if (repos.length === 0) {
-    console.log(chalk.yellow(t.noReposFound));
-    return;
+    if (!options.interactive) {
+      console.log(chalk.yellow(t.noReposFound));
+      return;
+    }
+    while (repos.length === 0) {
+      console.log(chalk.yellow(t.noReposFound));
+      const currentLang = options.lang
+        ? Array.isArray(options.lang)
+          ? options.lang
+          : [options.lang]
+        : undefined;
+      const retry = await listWizard(
+        t,
+        allRepos,
+        keywordQuery,
+        currentLang,
+        options.sort,
+        config.searchUpdateMode === 'live'
+          ? {
+              mode: 'live' as const,
+              onQueryChange: (nextQuery: string) => filterStarredRepos(allRepos, nextQuery),
+              onQueryResult: (value: unknown, nextQuery: string) => {
+                keywordQuery = nextQuery;
+                repos = value as StarredRepo[];
+                applyListFilters();
+                if (process.stdout.isTTY) {
+                  process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                  printTable(repos, t);
+                }
+              },
+              onConditionsChange: ({ lang }: { lang?: string[] }) => {
+                options.lang = lang;
+                applyListFilters();
+                if (process.stdout.isTTY) {
+                  process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                  printTable(repos, t);
+                }
+              },
+            }
+          : undefined,
+      );
+      if (!retry) {
+        console.log(t.aborted);
+        return;
+      }
+      keywordQuery = retry.query ?? '';
+      options.lang = retry.lang;
+      options.sort = retry.sort || undefined;
+      applyListFilters();
+    }
   }
 
   if (!options.interactive) {
@@ -157,6 +251,57 @@ export async function listCommand(options: ListOptions): Promise<void> {
     } else if (pageAction === 'prev') {
       currentPage--;
       needsClear = true;
+    } else if (pageAction === 'search') {
+      const currentLang = options.lang
+        ? Array.isArray(options.lang)
+          ? options.lang
+          : [options.lang]
+        : undefined;
+      const wizardResult = await listWizard(
+        t,
+        allRepos,
+        keywordQuery,
+        currentLang,
+        options.sort,
+        config.searchUpdateMode === 'live'
+          ? {
+              mode: 'live' as const,
+              onQueryChange: (nextQuery: string) => filterStarredRepos(allRepos, nextQuery),
+              onQueryResult: (value: unknown, nextQuery: string) => {
+                keywordQuery = nextQuery;
+                repos = value as StarredRepo[];
+                applyListFilters();
+                if (process.stdout.isTTY) {
+                  process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                  printTable(repos.slice(0, config.pageSize), t);
+                  process.stdout.write(`\n${t.paginationInfo(1, selectedNames.size)}\n`);
+                }
+              },
+              onConditionsChange: ({ lang }: { lang?: string[] }) => {
+                options.lang = lang;
+                applyListFilters();
+                if (process.stdout.isTTY) {
+                  process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                  printTable(repos.slice(0, config.pageSize), t);
+                  process.stdout.write(`\n${t.paginationInfo(1, selectedNames.size)}\n`);
+                }
+              },
+            }
+          : undefined,
+      );
+      if (wizardResult === null) {
+        console.log(t.aborted);
+        return;
+      }
+      keywordQuery = wizardResult.query ?? '';
+      options.lang = wizardResult.lang;
+      options.sort = wizardResult.sort || undefined;
+      applyListFilters();
+      currentPage = 1;
+      needsClear = true;
+      if (repos.length === 0) {
+        console.log(chalk.yellow(t.noReposFound));
+      }
     } else {
       break;
     }

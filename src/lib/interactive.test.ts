@@ -10,6 +10,7 @@ const {
   selectPageAction,
   selectMultipleStarredRepos,
   configWizard,
+  editSearchConditions,
   searchWizard,
 } = await import('./interactive.js');
 
@@ -104,6 +105,19 @@ describe('selectPageAction', () => {
     expect(process.stdin.isTTY).toBeFalsy();
     expect(await selectPageAction(t, 1, true)).toBeNull();
   });
+
+  test('opens search editing directly from the s key', async () => {
+    const stdin = process.stdin as typeof process.stdin & { setRawMode?: (value: boolean) => void };
+    const originalTTY = process.stdin.isTTY;
+    const originalSetRawMode = stdin.setRawMode;
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: true });
+    stdin.setRawMode = () => stdin;
+    const promise = selectPageAction(t, 1, true);
+    process.stdin.emit('keypress', 's', { name: 's' });
+    expect(await promise).toBe('search');
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: originalTTY });
+    stdin.setRawMode = originalSetRawMode;
+  });
 });
 
 describe('selectMultipleStarredRepos (raw keypress-driven multiselect)', () => {
@@ -186,5 +200,23 @@ describe('searchWizard', () => {
       limit: 50,
       multiSort: { preset: 'hot-new' },
     });
+  });
+});
+
+describe('editSearchConditions', () => {
+  test('surfaces condition update errors without terminating the editor', async () => {
+    enqueue([]);
+    let captured = false;
+    const result = await editSearchConditions(t, '', undefined, ['TypeScript'], {
+      mode: 'live',
+      onConditionsChange: async () => {
+        throw new Error('temporary search failure');
+      },
+      onConditionsError: () => {
+        captured = true;
+      },
+    });
+    expect(result).toEqual({ query: '', lang: undefined });
+    expect(captured).toBe(true);
   });
 });

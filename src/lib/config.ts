@@ -11,6 +11,7 @@ const DEFAULT_CONFIG: StelaConfig = {
   defaultLanguageFilter: [],
   pageSize: 30,
   lang: 'en',
+  searchUpdateMode: 'enter',
 };
 
 export function loadConfig(): StelaConfig {
@@ -18,7 +19,8 @@ export function loadConfig(): StelaConfig {
     return { ...DEFAULT_CONFIG };
   }
   const raw = readFileSync(CONFIG_PATH, 'utf-8');
-  return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+  const parsed = JSON.parse(raw) as Partial<StelaConfig>;
+  return { ...DEFAULT_CONFIG, ...parsed };
 }
 
 export function saveConfig(config: StelaConfig): void {

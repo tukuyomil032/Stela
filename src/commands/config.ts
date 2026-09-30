@@ -14,6 +14,9 @@ export function configShowCommand(): void {
   );
   console.log(`  ${t.configPageSize}:              ${chalk.cyan(String(config.pageSize))}`);
   console.log(`  ${t.configLang}:                  ${chalk.cyan(config.lang)}`);
+  console.log(
+    `  ${t.configSearchUpdateMode}:      ${chalk.cyan(config.searchUpdateMode ?? 'enter')}`,
+  );
 }
 
 export function configSetCommand(key: string, value: string): void {
@@ -49,6 +52,13 @@ export function configSetCommand(key: string, value: string): void {
         exitWithError(t.configInvalidLang);
       }
       config.lang = value as 'en' | 'ja';
+      break;
+    }
+    case 'searchUpdateMode': {
+      if (value !== 'enter' && value !== 'live') {
+        exitWithError(t.configInvalidSearchUpdateMode);
+      }
+      config.searchUpdateMode = value;
       break;
     }
     default:

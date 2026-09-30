@@ -20,13 +20,14 @@ program
   );
 
 program
-  .command('list')
+  .command('list [keywords...]')
   .description('List starred repositories')
   .option('--no-interactive', 'Output as table (non-interactive)')
   .option('--lang <lang>', 'Filter by programming language')
   .option('--sort <sort>', 'Sort by: stars or updated')
   .option('--refresh', 'Force refresh cache', false)
-  .action(async (options) => {
+  .action(async (keywords, options) => {
+    options.keywords = keywords?.length ? keywords : undefined;
     await listCommand(options);
   });
 
@@ -121,7 +122,9 @@ configCommand
 
 configCommand
   .command('set <key> <value>')
-  .description('Set a configuration value (keys: cacheTTL, defaultLanguageFilter, pageSize)')
+  .description(
+    'Set a configuration value (keys: cacheTTL, defaultLanguageFilter, pageSize, searchUpdateMode)',
+  )
   .action((key, value) => {
     configSetCommand(key, value);
   });

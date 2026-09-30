@@ -4,9 +4,15 @@ import { clearCache } from '../lib/cache.js';
 import { loadConfig } from '../lib/config.js';
 import { searchRepos, starRepo } from '../lib/github.js';
 import { createI18n } from '../lib/i18n.js';
-import { searchWizard, selectMultipleRepos, selectPageAction } from '../lib/interactive.js';
+import {
+  editSearchConditions,
+  searchControlsWizard,
+  selectMultipleRepos,
+  selectPageAction,
+} from '../lib/interactive.js';
 import { getOctokit } from '../lib/octokit.js';
 import type { MultiSortConfig } from '../lib/sort.js';
+import { sortByMultipleCriteria } from '../lib/sort.js';
 import { printSearchTable } from '../lib/table.js';
 import type { SearchRepo } from '../types/github.js';
 
@@ -26,54 +32,255 @@ export async function searchCommand(
   const t = createI18n(config.lang);
   const octokit = await getOctokit();
 
+  const applyResultSorting = (items: SearchRepo[]): SearchRepo[] => {
+    if (
+      !options.multiSort ||
+      (!options.multiSort.preset && (options.multiSort.criteria?.length ?? 0) === 0)
+    ) {
+      return items;
+    }
+    return sortByMultipleCriteria(items, options.multiSort).slice(
+      0,
+      options.limit ?? config.pageSize,
+    );
+  };
+
   let query = queryArgs && queryArgs.length > 0 ? queryArgs.join(' ') : undefined;
+  let initialLiveResult: { items: SearchRepo[]; totalCount: number } | undefined;
+  let initialEditorError = false;
+  let initialLiveRequest:
+    | { query: string; lang?: string | string[]; sort?: string; limit: number }
+    | undefined;
 
   if (query === undefined && options.interactive) {
-    const result = await searchWizard(t, config.pageSize);
+    const result = await editSearchConditions(
+      t,
+      '',
+      undefined,
+      undefined,
+      config.searchUpdateMode === 'live'
+        ? {
+            mode: 'live',
+            onQueryChange: async (nextQuery) => {
+              if (!nextQuery.trim()) return { items: [], totalCount: 0 };
+              return searchRepos(octokit, nextQuery, {
+                lang: options.lang,
+                sort: options.sort,
+                limit: options.limit,
+              });
+            },
+            onQueryResult: (value, nextQuery) => {
+              initialLiveResult = value as { items: SearchRepo[]; totalCount: number };
+              initialLiveRequest = {
+                query: nextQuery,
+                lang: options.lang,
+                sort: options.sort,
+                limit: options.limit ?? config.pageSize,
+              };
+              if (process.stdout.isTTY && initialLiveResult.items.length > 0) {
+                process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                printSearchTable(initialLiveResult.items, t);
+              }
+            },
+            onQueryError: () => console.error(t.searchFailed),
+            onConditionsChange: async (conditions) => {
+              options.lang = conditions.lang;
+              if (!conditions.query.trim()) {
+                initialLiveResult = { items: [], totalCount: 0 };
+                return;
+              }
+              const result = await searchRepos(octokit, conditions.query, {
+                lang: options.lang,
+                sort: options.sort,
+                limit: options.limit,
+              });
+              initialLiveResult = result;
+              initialLiveRequest = {
+                query: conditions.query,
+                lang: options.lang,
+                sort: options.sort,
+                limit: options.limit ?? config.pageSize,
+              };
+              if (process.stdout.isTTY) {
+                process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                printSearchTable(result.items, t);
+              }
+            },
+            onConditionsError: () => {
+              initialEditorError = true;
+              initialLiveResult = undefined;
+              console.error(t.searchFailed);
+            },
+          }
+        : undefined,
+    );
     if (!result) {
       console.log(t.aborted);
       return;
     }
     query = result.query;
-    if (!options.lang && result.lang) options.lang = result.lang;
-    if (!options.limit) options.limit = result.limit;
-    options.multiSort = result.multiSort;
+    if (result.lang) options.lang = result.lang;
+    const controls = await searchControlsWizard(t, options.limit ?? config.pageSize);
+    if (!controls) {
+      console.log(t.aborted);
+      return;
+    }
+    options.limit = controls.limit;
+    options.multiSort = controls.multiSort;
+    if (initialEditorError) query = '';
   }
   if (query === undefined) {
     console.error(t.searchNoQuery);
     process.exit(1);
   }
 
-  const spinner = ora(t.searchSearching).start();
-  let repos: SearchRepo[];
+  let repos: SearchRepo[] = [];
   let totalCount = 0;
 
-  try {
-    const result = await searchRepos(octokit, query, {
-      lang: options.lang,
-      sort: options.sort,
-      limit: options.limit,
-    });
-    repos = result.items;
-    totalCount = result.totalCount;
-    spinner.succeed(t.searchFound(totalCount));
-  } catch (e) {
-    spinner.fail(t.searchFailed);
-    throw e;
+  const canReuseInitialLive =
+    config.searchUpdateMode === 'live' &&
+    !initialEditorError &&
+    initialLiveResult &&
+    initialLiveRequest &&
+    initialLiveRequest.query === query &&
+    JSON.stringify(initialLiveRequest.lang) === JSON.stringify(options.lang) &&
+    initialLiveRequest.sort === options.sort &&
+    initialLiveRequest.limit === (options.limit ?? config.pageSize);
+
+  if (canReuseInitialLive) {
+    repos = applyResultSorting(initialLiveResult?.items ?? []);
+    totalCount = initialLiveResult?.totalCount ?? 0;
+  } else if (query.trim()) {
+    const spinner = ora(t.searchSearching).start();
+    try {
+      const result = await searchRepos(octokit, query, {
+        lang: options.lang,
+        sort: options.sort,
+        limit: options.limit,
+      });
+      repos = applyResultSorting(result.items);
+      totalCount = result.totalCount;
+      spinner.succeed(t.searchFound(totalCount));
+    } catch (e) {
+      spinner.fail(t.searchFailed);
+      throw e;
+    }
   }
 
-  if (
-    options.multiSort &&
-    (options.multiSort.preset || (options.multiSort.criteria?.length ?? 0) > 0)
-  ) {
-    const { sortByMultipleCriteria } = await import('../lib/sort.js');
-    repos = sortByMultipleCriteria(repos, options.multiSort);
-    repos = repos.slice(0, options.limit ?? 30);
-  }
+  repos = applyResultSorting(repos);
 
   if (repos.length === 0) {
-    console.log(chalk.yellow(t.noReposFound));
-    return;
+    if (!options.interactive) {
+      console.log(chalk.yellow(t.noReposFound));
+      return;
+    }
+    while (repos.length === 0) {
+      console.log(chalk.yellow(t.noReposFound));
+      const retryLang = options.lang
+        ? Array.isArray(options.lang)
+          ? options.lang
+          : [options.lang]
+        : undefined;
+      let retryEditorError = false;
+      let retryLiveResult: { items: SearchRepo[]; totalCount: number } | undefined;
+      let retryLiveRequest:
+        | { query: string; lang?: string | string[]; sort?: string; limit: number }
+        | undefined;
+      const retry = await editSearchConditions(
+        t,
+        query,
+        retryLang,
+        undefined,
+        config.searchUpdateMode === 'live'
+          ? {
+              mode: 'live' as const,
+              onQueryChange: async (nextQuery) => {
+                if (!nextQuery.trim()) return { items: [], totalCount: 0 };
+                return searchRepos(octokit, nextQuery, {
+                  lang: options.lang,
+                  sort: options.sort,
+                  limit: options.limit,
+                });
+              },
+              onQueryResult: (value, nextQuery) => {
+                const result = value as { items: SearchRepo[]; totalCount: number };
+                retryLiveResult = result;
+                retryLiveRequest = {
+                  query: nextQuery,
+                  lang: options.lang,
+                  sort: options.sort,
+                  limit: options.limit ?? config.pageSize,
+                };
+                repos = applyResultSorting(result.items);
+                totalCount = result.totalCount;
+                if (process.stdout.isTTY) {
+                  process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                  printSearchTable(repos, t);
+                }
+              },
+              onQueryError: () => console.error(t.searchFailed),
+              onConditionsChange: async (conditions) => {
+                options.lang = conditions.lang;
+                if (!conditions.query.trim()) {
+                  repos = [];
+                  totalCount = 0;
+                  return;
+                }
+                const result = await searchRepos(octokit, conditions.query, {
+                  lang: options.lang,
+                  sort: options.sort,
+                  limit: options.limit,
+                });
+                repos = applyResultSorting(result.items);
+                totalCount = result.totalCount;
+                retryLiveResult = result;
+                retryLiveRequest = {
+                  query: conditions.query,
+                  lang: options.lang,
+                  sort: options.sort,
+                  limit: options.limit ?? config.pageSize,
+                };
+              },
+              onConditionsError: () => {
+                retryEditorError = true;
+                console.error(t.searchFailed);
+              },
+            }
+          : undefined,
+      );
+      if (!retry) {
+        console.log(t.aborted);
+        return;
+      }
+      query = retry.query;
+      options.lang = retry.lang;
+      if (retryEditorError) continue;
+      if (!query.trim()) continue;
+      const canReuseRetryLive =
+        config.searchUpdateMode === 'live' &&
+        retryLiveResult &&
+        retryLiveRequest &&
+        retryLiveRequest.query === query &&
+        JSON.stringify(retryLiveRequest.lang) === JSON.stringify(options.lang) &&
+        retryLiveRequest.sort === options.sort &&
+        retryLiveRequest.limit === (options.limit ?? config.pageSize);
+      if (canReuseRetryLive) {
+        repos = applyResultSorting(retryLiveResult?.items ?? []);
+        totalCount = retryLiveResult?.totalCount ?? 0;
+      } else {
+        try {
+          const retryResult = await searchRepos(octokit, query, {
+            lang: options.lang,
+            sort: options.sort,
+            limit: options.limit,
+          });
+          repos = applyResultSorting(retryResult.items);
+          totalCount = retryResult.totalCount;
+        } catch {
+          console.error(t.searchFailed);
+        }
+      }
+    }
   }
 
   if (!options.interactive) {
@@ -139,6 +346,116 @@ export async function searchCommand(
         }
       }
       needsClear = true;
+    } else if (action === 'search') {
+      const currentLang = options.lang
+        ? Array.isArray(options.lang)
+          ? options.lang
+          : [options.lang]
+        : undefined;
+      let liveEditResult: { items: SearchRepo[]; totalCount: number } | undefined;
+      let liveEditError = false;
+      const edited = await editSearchConditions(t, query, currentLang, undefined, {
+        mode: config.searchUpdateMode ?? 'enter',
+        onQueryChange: async (nextQuery) => {
+          if (!nextQuery.trim()) return { items: [], totalCount: 0 };
+          return searchRepos(octokit, nextQuery, {
+            lang: options.lang,
+            sort: options.sort,
+            limit: options.limit,
+          });
+        },
+        onQueryResult: (value) => {
+          const result = value as { items: SearchRepo[]; totalCount: number };
+          liveEditResult = result;
+          currentRepos = applyResultSorting(result.items);
+          totalCount = result.totalCount;
+          if (process.stdout.isTTY) {
+            process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+            printSearchTable(currentRepos, t, undefined, 0);
+            process.stdout.write(`\n${t.paginationInfo(1, selectedNames.size)}\n`);
+          }
+        },
+        onQueryError: () => console.error(t.searchFailed),
+        onConditionsChange: async (conditions) => {
+          options.lang = conditions.lang;
+          if (!conditions.query.trim()) {
+            currentRepos = [];
+            totalCount = 0;
+            return;
+          }
+          const result = await searchRepos(octokit, conditions.query, {
+            lang: options.lang,
+            sort: options.sort,
+            limit: options.limit,
+          });
+          liveEditResult = result;
+          currentRepos = applyResultSorting(result.items);
+          totalCount = result.totalCount;
+          if (process.stdout.isTTY) {
+            process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+            printSearchTable(currentRepos, t, undefined, 0);
+            process.stdout.write(`\n${t.paginationInfo(1, selectedNames.size)}\n`);
+          }
+        },
+        onConditionsError: () => {
+          liveEditError = true;
+          liveEditResult = undefined;
+          console.error(t.searchFailed);
+        },
+      });
+      if (!edited) {
+        console.log(t.aborted);
+        return;
+      }
+      query = edited.query;
+      options.lang = edited.lang;
+      if (!query.trim()) {
+        currentRepos = [];
+        totalCount = 0;
+        currentPage = 1;
+        pageCache.clear();
+        needsClear = true;
+        continue;
+      }
+      if (liveEditError) {
+        currentRepos = [];
+        totalCount = 0;
+        currentPage = 1;
+        pageCache.clear();
+        needsClear = true;
+        continue;
+      }
+      if (config.searchUpdateMode === 'live' && liveEditResult) {
+        currentRepos = applyResultSorting(liveEditResult.items);
+        totalCount = liveEditResult.totalCount;
+        currentPage = 1;
+        pageCache.clear();
+        pageCache.set(1, { items: currentRepos, totalCount });
+        needsClear = true;
+        if (currentRepos.length === 0) console.log(chalk.yellow(t.noReposFound));
+        continue;
+      }
+      const editSpinner = ora(t.searchSearching).start();
+      try {
+        const result = await searchRepos(octokit, query, {
+          lang: options.lang,
+          sort: options.sort,
+          limit: options.limit,
+        });
+        currentRepos = applyResultSorting(result.items);
+        totalCount = result.totalCount;
+        editSpinner.succeed(t.searchFound(totalCount));
+      } catch (e) {
+        editSpinner.fail(t.searchFailed);
+        throw e;
+      }
+      currentPage = 1;
+      pageCache.clear();
+      pageCache.set(1, { items: currentRepos, totalCount });
+      needsClear = true;
+      if (currentRepos.length === 0) {
+        console.log(chalk.yellow(t.noReposFound));
+      }
     } else if (action === 'next' || action === 'prev') {
       needsClear = true;
       const targetPage = action === 'next' ? currentPage + 1 : currentPage - 1;
@@ -157,7 +474,7 @@ export async function searchCommand(
             limit: options.limit,
             page: targetPage,
           });
-          currentRepos = result.items;
+          currentRepos = applyResultSorting(result.items);
           totalCount = result.totalCount;
           pageSpinner.succeed(t.searchFound(totalCount));
         } catch (e) {
@@ -170,13 +487,7 @@ export async function searchCommand(
           continue;
         }
 
-        if (
-          options.multiSort &&
-          (options.multiSort.preset || (options.multiSort.criteria?.length ?? 0) > 0)
-        ) {
-          const { sortByMultipleCriteria } = await import('../lib/sort.js');
-          currentRepos = sortByMultipleCriteria(currentRepos, options.multiSort);
-        }
+        currentRepos = applyResultSorting(currentRepos);
 
         pageCache.set(targetPage, { items: currentRepos, totalCount });
         currentPage = targetPage;

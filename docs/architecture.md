@@ -32,7 +32,7 @@ src/
 - **Octokit（`@octokit/rest`）を使用する**。`src/lib/octokit.ts` の `getOctokit()` が、OS キーチェーンに保存されたトークンで初期化済みの Octokit クライアントを返す
 - **レート制限対策**: `@octokit/plugin-throttling` を組み込み、`onRateLimit` / `onSecondaryRateLimit` で自動リトライ・警告ログを行う
 - **使用 API（`octokit.rest.*`）**:
-  - `activity.listReposStarredByAuthenticatedUser` — スター一覧取得（ページネーション対応）
+  - `activity.listReposStarredByAuthenticatedUser` — スター一覧取得（`Link` ヘッダーの最終ページを使う進捗付きページネーション）
   - `activity.unstarRepoForAuthenticatedUser` — スター解除
   - `activity.starRepoForAuthenticatedUser` — スター付与
   - `search.repos` — リポジトリ検索
@@ -53,6 +53,8 @@ src/
   }
   ```
 - **TTL 判定**: `fetchedAt` から現在時刻を引いて `config.cacheTTL`（分）と比較
+- **ローカル検索**: `list [keyword...]` はキャッシュ済みの名前、説明、言語、トピックを AND 条件で絞り込む
+- **条件編集**: list/search の結果画面から `S` で共通条件エディタを開く
 - **TTL 30 分の根拠**: スター操作は低頻度（1日数回程度）。短すぎると API レート消費が増え、長すぎると陳腐化する。セッション中の繰り返し操作でキャッシュが効くバランスが 30 分
 
 ## 4. 認証フロー

@@ -11,28 +11,59 @@ function toErrorMessage(error: unknown): string {
 
 export async function fetchAllStarred(
   octokit: Octokit,
-  onPage?: (fetched: number, page: number) => void,
+  onPage?: (fetched: number, page: number, total?: number) => void,
 ): Promise<StarredRepo[]> {
   const repos: StarredRepo[] = [];
   let page = 1;
+  let lastPage: number | undefined;
+  let total: number | undefined;
+  const pageCache = new Map<number, StarredRepo[]>();
 
-  while (true) {
-    let data: StarredRepo[];
+  function getLastPage(headers: unknown): number | undefined {
+    if (!headers || typeof headers !== 'object') return undefined;
+    const link = (headers as { link?: unknown }).link;
+    if (typeof link !== 'string') return undefined;
+    const match = link.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/);
+    return match ? Number(match[1]) : undefined;
+  }
+
+  async function fetchPage(targetPage: number): Promise<StarredRepo[]> {
+    const cached = pageCache.get(targetPage);
+    if (cached) return cached;
     try {
       const res = await octokit.rest.activity.listReposStarredByAuthenticatedUser({
         per_page: 100,
-        page,
+        page: targetPage,
       });
-      data = res.data as StarredRepo[];
+      const data = res.data as StarredRepo[];
+      if (targetPage === 1) {
+        lastPage = getLastPage(res.headers);
+        if (lastPage === 1) total = data.length;
+        if (lastPage && lastPage > 1) {
+          const lastData = await fetchPage(lastPage);
+          total = (lastPage - 1) * 100 + lastData.length;
+        }
+      }
+      pageCache.set(targetPage, data);
+      return data;
     } catch (error) {
       exitWithError(`GitHub API error: ${toErrorMessage(error)}`);
     }
+  }
 
-    if (data.length === 0) break;
+  while (true) {
+    const data = await fetchPage(page);
+
+    if (data.length === 0) {
+      if (total === undefined) total = repos.length;
+      onPage?.(repos.length, page, total);
+      break;
+    }
 
     repos.push(...data);
-    onPage?.(repos.length, page);
-    if (data.length < 100) break;
+    if (total === undefined && data.length < 100) total = repos.length;
+    onPage?.(repos.length, page, total);
+    if ((lastPage !== undefined && page >= lastPage) || data.length < 100) break;
     page++;
   }
 

@@ -45,6 +45,9 @@ stela list
 # Filter by language
 stela list --lang typescript
 
+# Filter the local starred-repository cache; all terms must match
+stela list typescript cli
+
 # Search GitHub and star results
 stela search "awesome cli tools" --lang go
 ```
@@ -66,7 +69,7 @@ stela auth logout   # remove the stored token from the OS keychain
 Browse your starred repositories in an interactive picker.
 
 ```
-stela list [options]
+stela list [keyword...] [options]
 
 Options:
   --lang <language>   Filter by programming language
@@ -117,6 +120,8 @@ stela search "react state management" --lang typescript --limit 10
 stela search --no-interactive "rust cli" | head -5
 ```
 
+省略した場合は条件入力画面から検索を開始します。結果画面で `S` を押すとキーワードや言語条件を再編集できます。入力停止後に自動更新する場合は `stela config set searchUpdateMode live` を設定してください（デフォルトはEnter確定）。
+
 ### `stela cache`
 
 Inspect or clear the local starred-repo cache.
@@ -141,6 +146,7 @@ stela config set <key> <value>
 | `pageSize` | number | `30` | Items shown per page in interactive mode |
 | `defaultLanguageFilter` | string[] | `[]` | Language pre-filter applied to `list` |
 | `lang` | `en` \| `ja` | `en` | UI language |
+| `searchUpdateMode` | `enter` \| `live` | `enter` | Update conditions on Enter or after typing pauses |
 
 ```bash
 stela config set cacheTTL 60

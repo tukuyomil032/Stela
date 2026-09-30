@@ -30,6 +30,8 @@
 | `cache` | キャッシュ管理サブコマンド |
 | `config` | 設定の確認・変更 |
 
+`list` は引数にキーワードを指定すると、取得済みのスター一覧をリポジトリ名、説明、言語、トピックで大文字小文字を区別せず AND 検索する。インタラクティブな list/search の結果画面では `S` で条件を編集できる。
+
 詳細な仕様は [commands.md](./commands.md) を参照。
 
 ### 2.3 表示モード
@@ -52,10 +54,11 @@
 | `cacheTTL` | `number` | `30` | キャッシュ TTL（分） |
 | `defaultLanguageFilter` | `string[]` | `[]` | list コマンドのデフォルト言語フィルタ |
 | `pageSize` | `number` | `30` | インタラクティブ UI の1ページ表示件数 |
+| `searchUpdateMode` | `enter` / `live` | `enter` | 条件編集の更新タイミング |
 
 ## 3. Non-Functional Requirements
 
 - **動作環境**: Node.js 20 以上
 - **応答速度**: キャッシュヒット時 500ms 以内
-- **プログレス表示**: ネットワーク呼び出し中は `ora` スピナーを表示
+- **プログレス表示**: ネットワーク呼び出し中は `ora` スピナーと取得件数／総数バーを表示する。総数は GitHub の `Link: rel="last"` と最終ページ件数から確定する
 - **エラー出力**: stderr に出力し `exit code 1` で終了

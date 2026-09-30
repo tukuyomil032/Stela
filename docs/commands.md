@@ -16,7 +16,7 @@
 スター済みリポジトリをインタラクティブ UI で表示する。
 
 ```
-stela list [options]
+stela list [keyword...] [options]
 ```
 
 | オプション | デフォルト | 説明 |
@@ -25,6 +25,8 @@ stela list [options]
 | `--lang <language>` | — | 言語フィルタ（例: `--lang typescript`） |
 | `--limit <n>` | `50` | 表示件数上限（`--no-interactive` 時のみ有効） |
 | `--sort <field>` | `starred_at` | ソート順: `starred_at` \| `updated` \| `stars` |
+
+キーワードは `owner/repo`、説明、言語、トピックを大文字小文字を区別せずに検索します。複数キーワードは AND 条件です。結果画面で `S` を押すと条件を編集できます。
 
 **動作**:
 - インタラクティブ時: fuzzy リストで選択 → `unstar` / `open in browser` / `copy URL` アクション
@@ -76,12 +78,12 @@ stela star <owner/repo|URL>
 GitHub リポジトリを検索してスターを付ける。
 
 ```
-stela search <query...> [options]
+stela search [query...] [options]
 ```
 
 | 引数/オプション | デフォルト | 説明 |
 |--------------|-----------|------|
-| `<query...>` | 必須 | 検索クエリ（GitHub search syntax に準拠）。スペース区切りで複数キーワードを指定可能（例: `stela search react state management`）。クォート無しの複数トークンはスペース結合され、GitHub 側で暗黙的な AND 検索として扱われる |
+| `[query...]` | 任意（インタラクティブ時は入力必須） | 検索クエリ（GitHub search syntax に準拠）。引数を省略すると条件入力画面が開きます。`--no-interactive` では必須です |
 | `--lang <language>` | — | 言語フィルタ（クエリに `language:xxx` を付加） |
 | `--sort <field>` | `stars` | ソート順: `stars` \| `forks` \| `updated` |
 | `--limit <n>` | `30` | 結果件数上限（最大 100） |
@@ -126,11 +128,12 @@ stela config <subcommand> [key] [value]
 | キー | 型 | 説明 |
 |-----|---|------|
 | `cacheTTL` | `number`（分） | キャッシュ TTL |
-| `defaultLang` | `string` | `list` コマンドのデフォルト言語フィルタ |
+| `defaultLanguageFilter` | `string[]` | `list` コマンドのデフォルト言語フィルタ |
 | `pageSize` | `number` | インタラクティブ UI の1ページ表示件数 |
+| `searchUpdateMode` | `enter` / `live` | 条件編集の更新方法（デフォルト: `enter`） |
 
 **例**:
 ```bash
 stela config set cacheTTL 60
-stela config set defaultLang typescript
+stela config set defaultLanguageFilter typescript
 ```

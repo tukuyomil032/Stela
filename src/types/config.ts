@@ -3,4 +3,5 @@ export interface StelaConfig {
   defaultLanguageFilter: string[];
   pageSize: number;
   lang: 'en' | 'ja';
+  searchUpdateMode?: 'enter' | 'live';
 }

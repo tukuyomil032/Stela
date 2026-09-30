@@ -58,8 +58,7 @@ describe('fetchAllStarred', () => {
           },
         },
       },
-      // biome-ignore lint/suspicious/noExplicitAny: minimal fake client for this test
-    } as any as Octokit;
+    } as unknown as Octokit;
 
     const repos = await fetchAllStarred(octokit);
     expect(repos.length).toBe(101);
@@ -75,12 +74,75 @@ describe('fetchAllStarred', () => {
           },
         },
       },
-      // biome-ignore lint/suspicious/noExplicitAny: minimal fake client for this test
-    } as any as Octokit;
+    } as unknown as Octokit;
 
     await expect(fetchAllStarred(octokit)).rejects.toThrow('process.exit(1)');
     expect(exitCode).toBe(1);
     expect(exitMessage).toContain('boom');
+  });
+
+  test('reports a determinate zero total when the first page is empty', async () => {
+    const progress: Array<{ fetched: number; total?: number }> = [];
+    const octokit = {
+      rest: {
+        activity: {
+          listReposStarredByAuthenticatedUser: async () => ({ data: [] }),
+        },
+      },
+    } as unknown as Octokit;
+    await fetchAllStarred(octokit, (fetched, _page, total) => progress.push({ fetched, total }));
+    expect(progress).toEqual([{ fetched: 0, total: 0 }]);
+  });
+
+  test('reports the exact total after an exact multiple with no Link header', async () => {
+    const progress: Array<{ fetched: number; total?: number }> = [];
+    const octokit = {
+      rest: {
+        activity: {
+          listReposStarredByAuthenticatedUser: async ({ page }: { page: number }) => ({
+            data:
+              page <= 2
+                ? Array.from({ length: 100 }, (_, i) => fakeRepo({ id: page * 100 + i }))
+                : [],
+          }),
+        },
+      },
+    } as unknown as Octokit;
+    await fetchAllStarred(octokit, (fetched, _page, total) => progress.push({ fetched, total }));
+    expect(progress[progress.length - 1]).toEqual({ fetched: 200, total: 200 });
+  });
+
+  test('uses the last Link page to determine a short final page before progress', async () => {
+    const calls: number[] = [];
+    const progress: Array<{ fetched: number; total?: number }> = [];
+    const octokit = {
+      rest: {
+        activity: {
+          listReposStarredByAuthenticatedUser: async ({ page }: { page: number }) => {
+            calls.push(page);
+            if (page === 1) {
+              return {
+                data: Array.from({ length: 100 }, (_, i) => fakeRepo({ id: i })),
+                headers: {
+                  link: '<https://api.github.com/user/starred?page=3&per_page=100>; rel="last"',
+                },
+              };
+            }
+            if (page === 3) {
+              return { data: [fakeRepo({ id: 300 })] };
+            }
+            return { data: Array.from({ length: 100 }, (_, i) => fakeRepo({ id: 100 + i })) };
+          },
+        },
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: minimal fake client for this test
+    } as any as Octokit;
+    const repos = await fetchAllStarred(octokit, (fetched, _page, total) =>
+      progress.push({ fetched, total }),
+    );
+    expect(repos).toHaveLength(201);
+    expect(calls).toEqual([1, 3, 2]);
+    expect(progress[progress.length - 1]).toEqual({ fetched: 201, total: 201 });
   });
 });
 
