@@ -13,6 +13,7 @@ import stringWidth from 'string-width';
 import type { SearchRepo, StarredRepo } from '../types/github.js';
 import type { Messages } from './i18n.js';
 import { colorizeLanguage, LANGUAGE_COLORS } from './languageColors.js';
+import { createDebouncedSearch } from './searchUpdate.js';
 import type { MultiSortConfig, SortCriteria, SortField, SortOrder, SortPreset } from './sort.js';
 
 function wrapText(text: string, maxWidth: number): string[] {
@@ -286,7 +287,7 @@ export async function selectListAction(): Promise<ListAction | null> {
   return action as ListAction;
 }
 
-export type PageAction = 'select' | 'next' | 'prev' | 'done';
+export type PageAction = 'select' | 'next' | 'prev' | 'search' | 'done';
 
 export async function selectPageAction(
   t: Messages,
@@ -298,6 +299,7 @@ export async function selectPageAction(
   ];
   if (hasNextPage) options.push({ label: t.paginationNext, value: 'next' });
   if (currentPage > 1) options.push({ label: t.paginationPrev, value: 'prev' });
+  options.push({ label: t.paginationSearch, value: 'search' });
   options.push({ label: t.paginationDone, value: 'done' });
 
   if (!process.stdin.isTTY) return null;
@@ -377,6 +379,11 @@ export async function selectPageAction(
         return;
       }
 
+      if (str === 's' || str === 'S') {
+        done('search');
+        return;
+      }
+
       if (str) {
         const num = Number.parseInt(str, 10);
         if (!Number.isNaN(num) && num >= 1 && num <= options.length) {
@@ -395,6 +402,96 @@ export interface SearchWizardResult {
   lang?: string[];
   limit: number;
   multiSort: MultiSortConfig;
+}
+
+export async function searchControlsWizard(
+  t: Messages,
+  defaultLimit = 30,
+): Promise<Pick<SearchWizardResult, 'limit' | 'multiSort'> | null> {
+  const mode = await select({
+    message: t.wizardModePrompt,
+    options: [
+      { label: t.wizardModePreset, value: 'preset' },
+      { label: t.wizardModeCustom, value: 'custom' },
+    ],
+  });
+  if (isCancel(mode)) return null;
+
+  let multiSort: MultiSortConfig = {};
+  if (mode === 'preset') {
+    const preset = await select({
+      message: t.wizardPresetPrompt,
+      options: [
+        { label: t.wizardPresetHotNew, value: 'hot-new' },
+        { label: t.wizardPresetClassic, value: 'classic' },
+        { label: t.wizardPresetRecent, value: 'recent' },
+        { label: t.wizardPresetHiddenGems, value: 'hidden-gems' },
+      ],
+    });
+    if (isCancel(preset)) return null;
+    multiSort = { preset: preset as SortPreset };
+  } else {
+    const field = await select({
+      message: t.wizardSortFieldPrompt,
+      options: [
+        { label: 'Stars', value: 'stars' },
+        { label: 'Updated', value: 'updated' },
+        { label: 'Forks', value: 'forks' },
+      ],
+    });
+    if (isCancel(field)) return null;
+    const order = await select({
+      message: t.wizardSortOrderPrompt,
+      options: [
+        { label: 'Descending (high → low)', value: 'desc' },
+        { label: 'Ascending (low → high)', value: 'asc' },
+      ],
+    });
+    if (isCancel(order)) return null;
+    const criteria: SortCriteria[] = [
+      { field: field as SortField, order: order as SortOrder, weight: 1 },
+    ];
+    const addSort2 = await clackConfirm({ message: t.wizardSort2Prompt, initialValue: false });
+    if (isCancel(addSort2)) return null;
+    if (addSort2) {
+      const field2 = await select({
+        message: t.wizardSortFieldPrompt,
+        options: [
+          { label: 'Stars', value: 'stars' },
+          { label: 'Updated', value: 'updated' },
+          { label: 'Forks', value: 'forks' },
+        ],
+      });
+      if (isCancel(field2)) return null;
+      const order2 = await select({
+        message: t.wizardSortOrderPrompt,
+        options: [
+          { label: 'Descending (high → low)', value: 'desc' },
+          { label: 'Ascending (low → high)', value: 'asc' },
+        ],
+      });
+      if (isCancel(order2)) return null;
+      criteria[0].weight = 0.6;
+      criteria.push({ field: field2 as SortField, order: order2 as SortOrder, weight: 0.4 });
+    }
+    multiSort = { criteria };
+  }
+
+  const limitResult = await text({
+    message: t.wizardLimitPrompt,
+    defaultValue: String(defaultLimit),
+    validate: (value) => {
+      const limit = Number.parseInt(value ?? '', 10);
+      if (Number.isNaN(limit) || limit < 1 || limit > 200) {
+        return 'Enter a number between 1 and 200';
+      }
+    },
+  });
+  if (isCancel(limitResult)) return null;
+  return {
+    limit: Number.parseInt(String(limitResult), 10),
+    multiSort,
+  };
 }
 
 const ALL_LANGUAGES = Object.keys(LANGUAGE_COLORS).sort();
@@ -539,15 +636,157 @@ export async function searchWizard(
 }
 
 export interface ListWizardResult {
+  query?: string;
   sort?: string;
   lang?: string[];
+}
+
+export interface SearchConditions {
+  query: string;
+  lang?: string[];
+}
+
+interface SearchConditionEditorOptions {
+  mode?: 'enter' | 'live';
+  onQueryChange?: (query: string) => Promise<unknown> | unknown;
+  onQueryResult?: (result: unknown, query: string) => void;
+  onQueryError?: (error: unknown, query: string) => void;
+  onConditionsChange?: (conditions: SearchConditions) => Promise<void> | void;
+  onConditionsError?: (error: unknown, conditions: SearchConditions) => void;
+}
+
+async function liveText(
+  message: string,
+  initialValue: string,
+  onChange?: (value: string) => Promise<unknown> | unknown,
+  onResult?: (result: unknown, value: string) => void,
+  onError?: (error: unknown, value: string) => void,
+): Promise<string | null> {
+  if (!process.stdin.isTTY) return initialValue;
+  let value = initialValue;
+  const update = onChange
+    ? createDebouncedSearch(async (next) => {
+        return onChange(next);
+      }, 400)
+    : undefined;
+  process.stdin.resume();
+  readline.emitKeypressEvents(process.stdin);
+  process.stdin.setRawMode(true);
+  return new Promise((resolve) => {
+    const render = (): void => {
+      process.stdout.write(`\r\x1b[2K  ${message} ${value}`);
+    };
+    const cleanup = (result: string | null): void => {
+      update?.cancel();
+      process.stdin.removeListener('keypress', onKeypress);
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+      process.stdout.write('\n');
+      resolve(result);
+    };
+    const onKeypress = (str: string, key: readline.Key): void => {
+      if ((key?.ctrl && key.name === 'c') || key?.name === 'escape') {
+        cleanup(null);
+      } else if (key?.name === 'return') {
+        cleanup(value);
+      } else if (key?.name === 'backspace') {
+        value = value.slice(0, -1);
+        render();
+        if (update) {
+          const nextValue = value;
+          void update
+            .schedule(nextValue)
+            .then((result) => {
+              if (result !== undefined) {
+                onResult?.(result, nextValue);
+                render();
+              }
+            })
+            .catch((error) => onError?.(error, nextValue));
+        }
+      } else if (str && !key?.ctrl && !key?.meta) {
+        value += str;
+        render();
+        if (update) {
+          const nextValue = value;
+          void update
+            .schedule(nextValue)
+            .then((result) => {
+              if (result !== undefined) {
+                onResult?.(result, nextValue);
+                render();
+              }
+            })
+            .catch((error) => onError?.(error, nextValue));
+        }
+      }
+    };
+    process.stdin.on('keypress', onKeypress);
+    render();
+  });
+}
+
+/** Shared condition editor used by both starred-list and GitHub search views. */
+export async function editSearchConditions(
+  t: Messages,
+  initialQuery = '',
+  initialLang?: string[],
+  languages: string[] = ALL_LANGUAGES,
+  editorOptions: SearchConditionEditorOptions = {},
+): Promise<SearchConditions | null> {
+  const queryResult =
+    editorOptions.mode === 'live'
+      ? await liveText(
+          t.wizardQueryPrompt,
+          initialQuery,
+          editorOptions.onQueryChange,
+          editorOptions.onQueryResult,
+          editorOptions.onQueryError,
+        )
+      : await text({ message: t.wizardQueryPrompt, defaultValue: initialQuery });
+  if (queryResult === null || isCancel(queryResult)) return null;
+
+  const langResult = await autocompleteMultiselect({
+    message: t.wizardLangPrompt,
+    options: languages.map((language) => ({ label: colorizeLanguage(language), value: language })),
+    initialValues: initialLang,
+    required: false,
+  });
+  if (isCancel(langResult)) return null;
+
+  const selected = langResult as string[];
+  const conditions = {
+    query: String(queryResult).trim(),
+    lang: selected.length > 0 ? selected : undefined,
+  };
+  if (editorOptions.mode === 'live') {
+    try {
+      await editorOptions.onConditionsChange?.(conditions);
+    } catch (error) {
+      editorOptions.onConditionsError?.(error, conditions);
+    }
+  }
+  return conditions;
 }
 
 export async function listWizard(
   t: Messages,
   repos: StarredRepo[],
+  initialQuery = '',
+  initialLang?: string[],
+  initialSort?: string,
+  editorOptions: SearchConditionEditorOptions = {},
 ): Promise<ListWizardResult | null> {
   showHeader();
+
+  const conditions = await editSearchConditions(
+    t,
+    initialQuery,
+    initialLang,
+    [...new Set(repos.map((r) => r.language).filter((l): l is string => l !== null))].sort(),
+    editorOptions,
+  );
+  if (!conditions) return null;
 
   const sort = await select({
     message: t.listWizardSortPrompt,
@@ -556,26 +795,14 @@ export async function listWizard(
       { label: t.listWizardSortUpdated, value: 'updated' },
       { label: t.listWizardSortDefault, value: '' },
     ],
+    initialValue: initialSort ?? '',
   });
   if (isCancel(sort)) return null;
 
-  const langs = [
-    ...new Set(repos.map((r) => r.language).filter((l): l is string => l !== null)),
-  ].sort();
-
-  const langOptions = langs.map((l) => ({ label: colorizeLanguage(l), value: l }));
-
-  const langResult = await autocompleteMultiselect({
-    message: t.listWizardLangPrompt,
-    options: langOptions,
-    required: false,
-  });
-  if (isCancel(langResult)) return null;
-  const selectedLangs = langResult as string[];
-
   return {
-    sort: (sort as string) || undefined,
-    lang: selectedLangs.length > 0 ? selectedLangs : undefined,
+    query: conditions.query || undefined,
+    sort: sort as string,
+    lang: conditions.lang,
   };
 }
 
@@ -601,6 +828,7 @@ export async function configWizard(
     defaultLanguageFilter: string[];
     pageSize: number;
     lang: string;
+    searchUpdateMode?: 'enter' | 'live';
   },
   onSet: (key: string, value: string) => void,
 ): Promise<void> {
@@ -612,6 +840,10 @@ export async function configWizard(
       { label: `cacheTTL (current: ${currentConfig.cacheTTL})`, value: 'cacheTTL' },
       { label: `pageSize (current: ${currentConfig.pageSize})`, value: 'pageSize' },
       { label: `lang (current: ${currentConfig.lang})`, value: 'lang' },
+      {
+        label: `searchUpdateMode (current: ${currentConfig.searchUpdateMode ?? 'enter'})`,
+        value: 'searchUpdateMode',
+      },
     ],
   });
   if (isCancel(key)) return;

@@ -8,6 +8,8 @@ export interface StarredRepo {
   stargazers_count: number;
   updated_at: string;
   forks_count: number;
+  /** Topics are omitted by older cache entries and by some GitHub responses. */
+  topics?: string[];
 }
 
 export type SearchRepo = StarredRepo;

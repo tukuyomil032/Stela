@@ -20,6 +20,7 @@ describe('loadConfig', () => {
       defaultLanguageFilter: [],
       pageSize: 30,
       lang: 'en',
+      searchUpdateMode: 'enter',
     });
   });
 
@@ -41,12 +42,25 @@ describe('saveConfig / loadConfig round-trip', () => {
       defaultLanguageFilter: ['rust'],
       pageSize: 10,
       lang: 'ja',
+      searchUpdateMode: 'enter',
     });
     expect(loadConfig()).toEqual({
       cacheTTL: 15,
       defaultLanguageFilter: ['rust'],
       pageSize: 10,
       lang: 'ja',
+      searchUpdateMode: 'enter',
     });
+  });
+
+  test('persists the live search update mode', () => {
+    saveConfig({
+      cacheTTL: 30,
+      defaultLanguageFilter: [],
+      pageSize: 30,
+      lang: 'en',
+      searchUpdateMode: 'live',
+    });
+    expect(loadConfig().searchUpdateMode).toBe('live');
   });
 });

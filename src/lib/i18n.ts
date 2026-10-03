@@ -58,11 +58,13 @@ export type Messages = {
   configDefaultLang: string;
   configPageSize: string;
   configLang: string;
+  configSearchUpdateMode: string;
   configSet: (k: string, v: string) => string;
   configUnknownKey: (k: string) => string;
   configInvalidLang: string;
   configInvalidTTL: string;
   configInvalidPageSize: string;
+  configInvalidSearchUpdateMode: string;
   configSelectKey: string;
   configInputValue: string;
   configWizardKey: string;
@@ -80,6 +82,7 @@ export type Messages = {
   paginationNext: string;
   paginationPrev: string;
   paginationDone: string;
+  paginationSearch: string;
   paginationInfo: (page: number, selected: number) => string;
 };
 
@@ -141,12 +144,14 @@ const en: Messages = {
   configDefaultLang: 'defaultLanguageFilter',
   configPageSize: 'pageSize',
   configLang: 'lang',
+  configSearchUpdateMode: 'searchUpdateMode',
   configSet: (k, v) => `Set ${k} = ${v}`,
   configUnknownKey: (k) =>
-    `Unknown config key: "${k}". Valid keys: cacheTTL, defaultLanguageFilter, pageSize, lang`,
+    `Unknown config key: "${k}". Valid keys: cacheTTL, defaultLanguageFilter, pageSize, lang, searchUpdateMode`,
   configInvalidLang: `lang must be 'en' or 'ja'`,
   configInvalidTTL: 'cacheTTL must be a positive number',
   configInvalidPageSize: 'pageSize must be a positive number',
+  configInvalidSearchUpdateMode: "searchUpdateMode must be 'enter' or 'live'",
   configSelectKey: 'Select a config key to update:',
   configInputValue: 'New value:',
   configWizardKey: 'Config key:',
@@ -164,6 +169,7 @@ const en: Messages = {
   paginationNext: 'Next page →',
   paginationPrev: '← Previous page',
   paginationDone: 'Done (confirm selections)',
+  paginationSearch: 'Edit search conditions',
   paginationInfo: (page, selected) => `  Page ${page} | ${selected} repo(s) selected`,
 };
 
@@ -225,12 +231,14 @@ const ja: Messages = {
   configDefaultLang: 'デフォルト言語フィルター',
   configPageSize: 'ページサイズ',
   configLang: '表示言語',
+  configSearchUpdateMode: '検索更新モード',
   configSet: (k, v) => `${k} = ${v} に設定しました`,
   configUnknownKey: (k) =>
-    `不明な設定キー: "${k}"。有効なキー: cacheTTL, defaultLanguageFilter, pageSize, lang`,
+    `不明な設定キー: "${k}"。有効なキー: cacheTTL, defaultLanguageFilter, pageSize, lang, searchUpdateMode`,
   configInvalidLang: `lang は 'en' または 'ja' である必要があります`,
   configInvalidTTL: 'cacheTTL は正の数値である必要があります',
   configInvalidPageSize: 'pageSize は正の数値である必要があります',
+  configInvalidSearchUpdateMode: "searchUpdateMode は 'enter' または 'live' である必要があります",
   configSelectKey: '更新する設定キーを選択:',
   configInputValue: '新しい値:',
   configWizardKey: '設定キー:',
@@ -248,6 +256,7 @@ const ja: Messages = {
   paginationNext: '次のページ →',
   paginationPrev: '← 前のページ',
   paginationDone: '完了 (選択を確定)',
+  paginationSearch: '検索条件を編集',
   paginationInfo: (page, selected) => `  ページ ${page} | ${selected} 件選択済み`,
 };
 

@@ -66,6 +66,22 @@ describe('listCommand: cache-hit path (no network call needed/attempted)', () =>
     expect(out).not.toContain('owner/ts-repo');
   });
 
+  test('keyword arguments filter cached repos across name, description, and topics', async () => {
+    saveCache([
+      repo({
+        id: 1,
+        full_name: 'owner/cli-tool',
+        description: 'A useful utility',
+        topics: ['developer-tools'],
+      }),
+      repo({ id: 2, full_name: 'owner/web', description: 'A web app', topics: ['frontend'] }),
+    ]);
+    await listCommand({ interactive: false, refresh: false, keywords: ['CLI', 'developer'] });
+    const out = logs.join('\n');
+    expect(out).toContain('owner/cli-tool');
+    expect(out).not.toContain('owner/web');
+  });
+
   test('--sort stars orders results by star count descending', async () => {
     saveCache([
       repo({ id: 1, full_name: 'owner/low', stargazers_count: 5 }),

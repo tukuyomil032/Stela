@@ -40,6 +40,7 @@ describe('configShowCommand', () => {
     const out = logs.join('\n');
     expect(out).toContain('30');
     expect(out).toContain('en');
+    expect(out).toContain('enter');
   });
 });
 
@@ -59,8 +60,17 @@ describe('configSetCommand', () => {
     expect(loadConfig().lang).toBe('ja');
   });
 
+  test('persists live search update mode', () => {
+    configSetCommand('searchUpdateMode', 'live');
+    expect(loadConfig().searchUpdateMode).toBe('live');
+  });
+
   test('rejects an invalid lang', () => {
     expect(() => configSetCommand('lang', 'fr')).toThrow('process.exit(1)');
+  });
+
+  test('rejects an invalid search update mode', () => {
+    expect(() => configSetCommand('searchUpdateMode', 'instant')).toThrow('process.exit(1)');
   });
 
   test('splits defaultLanguageFilter on commas and trims whitespace', () => {
