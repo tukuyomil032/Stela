@@ -165,7 +165,9 @@ describe('createFetchProgressRenderer', () => {
     renderer.update({ fetched: 100, total: 201 });
     renderer.fail('Fetch failed.');
 
-    expect(stream.output).not.toContain('\u001b[');
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: The test must match terminal cursor controls.
+    const cursorControlPattern = /\x1b\[(?:\??\d*(?:;\d+)*)?[ABCDEFGHJKfhl]/;
+    expect(stream.output).not.toMatch(cursorControlPattern);
     expect(stream.output).toContain('Fetch failed.');
   });
 
