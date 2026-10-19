@@ -4,6 +4,7 @@ import stringWidth from 'string-width';
 import type { SearchRepo, StarredRepo } from '../types/github.js';
 import type { Messages } from './i18n.js';
 import { colorizeLanguage } from './languageColors.js';
+import { isTrustedGitHubUrl } from './system.js';
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -16,6 +17,13 @@ function formatDate(dateString: string): string {
 function padRaw(rawStr: string, coloredStr: string, width: number): string {
   const padding = Math.max(0, width - stringWidth(rawStr));
   return coloredStr + ' '.repeat(padding);
+}
+
+function hyperlink(url: string, text: string): string {
+  if (!process.stdout.isTTY || !isTrustedGitHubUrl(url)) {
+    return text;
+  }
+  return `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`;
 }
 
 function printBox(title: string): void {
@@ -192,7 +200,7 @@ export function printSearchTable(
     const forksRaw = `⎇ ${forksCount}`;
     const dateRaw = formatDate(repo.updated_at);
 
-    const nameColored = padRaw(nameRaw, chalk.cyan(nameRaw), nameWidth);
+    const nameColored = padRaw(nameRaw, hyperlink(repo.html_url, chalk.cyan(nameRaw)), nameWidth);
     const langColored = padRaw(langRaw, colorizeLanguage(repo.language), langWidth);
     const starsColored = padRaw(
       starsRaw,

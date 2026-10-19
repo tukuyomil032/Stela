@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import chalk from 'chalk';
 
-function isTrustedGitHubUrl(url: string): boolean {
+export function isTrustedGitHubUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return parsed.protocol === 'https:' && /(^|\.)github\.com$/.test(parsed.hostname);
