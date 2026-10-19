@@ -9,10 +9,12 @@ import {
   searchControlsWizard,
   selectMultipleRepos,
   selectPageAction,
+  selectRepo,
 } from '../lib/interactive.js';
 import { getOctokit } from '../lib/octokit.js';
 import type { MultiSortConfig } from '../lib/sort.js';
 import { sortByMultipleCriteria } from '../lib/sort.js';
+import { openInBrowser } from '../lib/system.js';
 import { printSearchTable } from '../lib/table.js';
 import type { SearchRepo } from '../types/github.js';
 
@@ -316,7 +318,9 @@ export async function searchCommand(
 
     const hasNextPage = currentPage * perPage < totalCount;
 
-    const action = await selectPageAction(t, currentPage, hasNextPage);
+    const action = await selectPageAction(t, currentPage, hasNextPage, {
+      allowOpen: true,
+    });
 
     if (action === null) {
       console.log(t.aborted);
@@ -492,6 +496,12 @@ export async function searchCommand(
         pageCache.set(targetPage, { items: currentRepos, totalCount });
         currentPage = targetPage;
       }
+    } else if (action === 'open') {
+      const repo = await selectRepo(currentRepos);
+      if (repo) {
+        openInBrowser(repo.html_url);
+      }
+      needsClear = true;
     } else {
       // done
       break;

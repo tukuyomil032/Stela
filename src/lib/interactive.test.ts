@@ -118,6 +118,33 @@ describe('selectPageAction', () => {
     Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: originalTTY });
     stdin.setRawMode = originalSetRawMode;
   });
+
+  test("returns 'open' from the o key when allowOpen is true", async () => {
+    const stdin = process.stdin as typeof process.stdin & { setRawMode?: (value: boolean) => void };
+    const originalTTY = process.stdin.isTTY;
+    const originalSetRawMode = stdin.setRawMode;
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: true });
+    stdin.setRawMode = () => stdin;
+    const promise = selectPageAction(t, 1, false, { allowOpen: true });
+    process.stdin.emit('keypress', 'o', { name: 'o' });
+    expect(await promise).toBe('open');
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: originalTTY });
+    stdin.setRawMode = originalSetRawMode;
+  });
+
+  test('ignores the o key when allowOpen is not set', async () => {
+    const stdin = process.stdin as typeof process.stdin & { setRawMode?: (value: boolean) => void };
+    const originalTTY = process.stdin.isTTY;
+    const originalSetRawMode = stdin.setRawMode;
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: true });
+    stdin.setRawMode = () => stdin;
+    const promise = selectPageAction(t, 1, false);
+    process.stdin.emit('keypress', 'o', { name: 'o' });
+    process.stdin.emit('keypress', '', { name: 'escape' });
+    expect(await promise).toBeNull();
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: originalTTY });
+    stdin.setRawMode = originalSetRawMode;
+  });
 });
 
 describe('selectMultipleStarredRepos (raw keypress-driven multiselect)', () => {

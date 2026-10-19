@@ -287,16 +287,19 @@ export async function selectListAction(): Promise<ListAction | null> {
   return action as ListAction;
 }
 
-export type PageAction = 'select' | 'next' | 'prev' | 'search' | 'done';
+export type PageAction = 'select' | 'next' | 'prev' | 'search' | 'open' | 'done';
 
 export async function selectPageAction(
   t: Messages,
   currentPage: number,
   hasNextPage: boolean,
+  pageOptions: { allowOpen?: boolean } = {},
 ): Promise<PageAction | null> {
+  const allowOpen = pageOptions.allowOpen ?? false;
   const options: { label: string; value: PageAction }[] = [
     { label: t.paginationSelect, value: 'select' },
   ];
+  if (allowOpen) options.push({ label: t.paginationOpen, value: 'open' });
   if (hasNextPage) options.push({ label: t.paginationNext, value: 'next' });
   if (currentPage > 1) options.push({ label: t.paginationPrev, value: 'prev' });
   options.push({ label: t.paginationSearch, value: 'search' });
@@ -381,6 +384,11 @@ export async function selectPageAction(
 
       if (str === 's' || str === 'S') {
         done('search');
+        return;
+      }
+
+      if (allowOpen && (str === 'o' || str === 'O')) {
+        done('open');
         return;
       }
 

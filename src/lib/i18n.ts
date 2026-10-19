@@ -79,6 +79,7 @@ export type Messages = {
   errorTokenFailed: string;
   paginationPrompt: (page: number) => string;
   paginationSelect: string;
+  paginationOpen: string;
   paginationNext: string;
   paginationPrev: string;
   paginationDone: string;
@@ -166,6 +167,7 @@ const en: Messages = {
   errorTokenFailed: 'GitHub token authentication failed.',
   paginationPrompt: (page) => `Page ${page} — Choose an action:`,
   paginationSelect: 'Select repos from this page',
+  paginationOpen: 'Open a repo in browser',
   paginationNext: 'Next page →',
   paginationPrev: '← Previous page',
   paginationDone: 'Done (confirm selections)',
@@ -253,6 +255,7 @@ const ja: Messages = {
   errorTokenFailed: 'GitHub トークンの認証に失敗しました。',
   paginationPrompt: (page) => `ページ ${page} — アクションを選択:`,
   paginationSelect: 'このページからリポジトリを選択',
+  paginationOpen: 'リポジトリをブラウザで開く',
   paginationNext: '次のページ →',
   paginationPrev: '← 前のページ',
   paginationDone: '完了 (選択を確定)',

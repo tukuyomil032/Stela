@@ -68,4 +68,44 @@ describe('printSearchTable', () => {
     expect(output).toContain('a/b');
     expect(output).toContain('c/d');
   });
+
+  describe('repository hyperlinks', () => {
+    const osc8Prefix = '\x1b]8;;';
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: strips terminal escape sequences
+    const osc8 = /\x1b\]8;;[^\x1b]*\x1b\\/g;
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: strips terminal escape sequences
+    const sgr = /\x1b\[[0-9;]*m/g;
+    const originalIsTTY = process.stdout.isTTY;
+
+    function render(isTTY: boolean, overrides: Partial<Record<string, unknown>> = {}): string {
+      process.stdout.isTTY = isTTY;
+      lines = [];
+      printSearchTable([repo(overrides)], t);
+      return lines.join('\n');
+    }
+
+    afterEach(() => {
+      process.stdout.isTTY = originalIsTTY;
+    });
+
+    test('wraps the repo name in an OSC 8 link on a TTY', () => {
+      const output = render(true);
+      expect(output).toContain(`${osc8Prefix}https://github.com/owner/foo`);
+    });
+
+    test('emits no OSC 8 sequence when stdout is not a TTY', () => {
+      expect(render(false)).not.toContain(osc8Prefix);
+    });
+
+    test('emits no OSC 8 sequence for untrusted URLs', () => {
+      for (const html_url of ['http://github.com/owner/foo', 'https://evil.example.com/x']) {
+        expect(render(true, { html_url })).not.toContain(osc8Prefix);
+      }
+    });
+
+    test('keeps the visible layout identical with and without links', () => {
+      const strip = (s: string) => s.replace(osc8, '').replace(sgr, '');
+      expect(strip(render(true))).toBe(strip(render(false)));
+    });
+  });
 });
